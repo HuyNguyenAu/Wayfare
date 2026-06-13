@@ -11,19 +11,39 @@ namespace WayFare;
 
 internal class LoadToolException(string message, Exception? innerException = null) : Exception(message, innerException);
 
-internal record LoadToolsResult(ITool[] Tools, Exception[] Errors);
-
 internal interface IToolManager
 {
-    Task<LoadToolsResult> LoadToolsFromDirectoryAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken);
+    public ITool[] Tools { get; }
+    public Exception[] Errors { get; }
+
+    Task LoadToolsAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken);
+    ITool GetTool(string name);
 }
 
 internal sealed class ToolManager : IToolManager
 {
     private readonly string[] _ignoreFiles = ["ITool.cs", "ToolHelpers.cs"];
-    // private ToolAssemblyLoadContext _currentContext = new();
 
-    public async Task<LoadToolsResult> LoadToolsFromDirectoryAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken)
+    public ITool[] Tools { get; private set; } = [];
+    public Exception[] Errors { get; private set; } = [];
+
+    public async Task LoadToolsAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken)
+    {
+        LoadToolsResult loadToolsResult = await LoadToolsFromDirectoryAsync(directoryPath, searchPattern, compiledDirectoryPath, cancellationToken);
+
+        Tools = loadToolsResult.Tools;
+        Errors = loadToolsResult.Errors;
+    }
+
+    public ITool GetTool(string name)
+    {
+        ITool? tool = Tools.FirstOrDefault(tool => tool.Name == name)
+            ?? throw new KeyNotFoundException($"No tool found with name '{name}'");
+        
+        return tool;
+    }
+
+    private async Task<LoadToolsResult> LoadToolsFromDirectoryAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(directoryPath))
         {
@@ -212,5 +232,6 @@ internal sealed class ToolManager : IToolManager
             throw new LoadToolException($"Failed to load tool from '{toolPath}'", ex);
         }
     }
-}
 
+    internal record LoadToolsResult(ITool[] Tools, Exception[] Errors);
+}

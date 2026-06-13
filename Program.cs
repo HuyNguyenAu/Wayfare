@@ -9,15 +9,15 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
-        Session session = new();
-
         ChatClient chatClient = new("MODEL_NAME", new ApiKeyCredential("local-no-key-needed"), new OpenAIClientOptions()
         {
             Endpoint = new Uri("http://127.0.0.1:8080/")
         });
         OpenAIClient openAIClient = new(chatClient);
 
-        Engine engine = new(session, openAIClient);
+        Session session = new();
+        ToolManager toolManager = new();
+        Engine engine = new(session, toolManager, openAIClient);
 
         CancellationTokenSource cancellationTokenSource = new();
         Console.CancelKeyPress += (sender, eventArgs) =>
@@ -25,6 +25,8 @@ public class Program
             eventArgs.Cancel = true;
             cancellationTokenSource.Cancel();
         };
+
+        await toolManager.LoadToolsAsync("Tools", "*.cs", @"C:\Users\Kaze\source\repos\Wayfare\CompiledTools", cancellationTokenSource.Token);
 
         try
         {

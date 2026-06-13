@@ -1,4 +1,5 @@
 using OpenAI.Chat;
+using WayFare.Tools;
 
 namespace WayFare;
 
@@ -7,7 +8,7 @@ internal interface IEngine
     Task RunAsync(CancellationToken cancellationToken);
 }
 
-internal class Engine(ISession session, IChatClient chatClient) : IEngine
+internal class Engine(ISession session, IToolManager toolManager, IChatClient chatClient) : IEngine
 {
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -23,10 +24,26 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
             {
                 foreach (ToolCall toolCall in chatResponse.ToolCalls)
                 {
-                    session.RequestAction(toolCall.ToolId, toolCall.Name, toolCall.Args);
+                    session.RequestAction(toolCall.ToolId, toolCall.Name, toolCall.Arguments);
 
-                    string toolResult = $"Executed {toolCall.Name} with args {toolCall.Args}";
-                    session.RecordObservation(toolCall.ToolId, toolCall.Name, toolResult);
+                    try
+                    {
+                        ITool tool = toolManager.GetTool(toolCall.ToolId);
+                        ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
+
+                        if (result.Success)
+                        {
+                            session.RecordObservation(toolCall.ToolId, toolCall.Name, result.Result);
+                        }
+                        else
+                        {
+                            session.RecordObservation(toolCall.ToolId, toolCall.Name, $"Failed to execute tool '{toolCall.Name}' because {result.Error}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        session.RecordObservation(toolCall.ToolId, toolCall.Name, $"Exception occurred while executing tool '{toolCall.Name}' because {ex.Message}");
+                    }
                 }
             }
             // Not all models return a tool calls reason. Some will use finish reason stop or length to hand back
