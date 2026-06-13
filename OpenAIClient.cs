@@ -11,7 +11,7 @@ internal enum FinishReason
     ToolCalls,
 }
 
-internal record ToolCall(string ToolId, string Name, string Args);
+internal record ToolCall(string ToolId, string Name, string Arguments);
 internal record ChatResponse(string Content, List<ToolCall> ToolCalls, FinishReason FinishReason);
 
 internal interface IChatClient
@@ -82,7 +82,10 @@ internal class OpenAIClient(ChatClient client) : IChatClient
                 toolCall.Args.Append(toolCallUpdate.FunctionArgumentsUpdate);
             }
 
-            chatFinishReason = chatCompletionUpdate.FinishReason;
+            if (chatCompletionUpdate.FinishReason is not null)
+            {
+                chatFinishReason = chatCompletionUpdate.FinishReason;
+            }
         }
 
         List<ToolCall> assembledToolCalls = [];
