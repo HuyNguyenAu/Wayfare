@@ -16,7 +16,7 @@ internal record ChatResponse(string Content, List<ToolCall> ToolCalls, FinishRea
 
 internal interface IChatClient
 {
-    Task<ChatResponse> ChatAsync(ChatMessage[] messages, CancellationToken cancellationToken);
+    Task<ChatResponse> ChatAsync(ISessionMessage[] messages, CancellationToken cancellationToken);
 }
 
 internal class OpenAIClient(ChatClient client) : IChatClient
@@ -26,11 +26,27 @@ internal class OpenAIClient(ChatClient client) : IChatClient
         AllowParallelToolCalls = false
     };
 
-    public async Task<ChatResponse> ChatAsync(ChatMessage[] messages, CancellationToken cancellationToken)
+    public async Task<ChatResponse> ChatAsync(ISessionMessage[] sessionMessages, CancellationToken cancellationToken)
     {
         ChatFinishReason? chatFinishReason = null;
         StringBuilder assembledContent = new();
         Dictionary<int, ToolCallBuilder> toolCalls = [];
+
+        List<ChatMessage> messages = [];
+
+        foreach (ISessionMessage sessionMessage in sessionMessages)
+        {
+            ChatMessage chatMessage = sessionMessage switch
+            {
+                SystemMessage message => new SystemChatMessage(message.Content),
+                UserMessage message => new UserChatMessage(message.Content),
+                AssistantMessage message => new AssistantChatMessage(message.Content),
+                ToolCallMessage message => new AssistantChatMessage([ChatToolCall.CreateFunctionToolCall(message.ToolId, message.ToolName, BinaryData.FromString(message.Arguments))]),
+                ToolResultMessage message => new ToolChatMessage(message.ToolId, message.Result),
+                _ => throw new InvalidOperationException($"Unknown message type: {sessionMessage.GetType().Name}")
+            };
+            messages.Add(chatMessage);
+        }
 
         await foreach (StreamingChatCompletionUpdate chatCompletionUpdate in client.CompleteChatStreamingAsync(messages, options, cancellationToken))
         {

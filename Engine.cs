@@ -16,23 +16,7 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
 
         while (session.State != State.Done && !cancellationToken.IsCancellationRequested)
         {
-            List<ChatMessage> messages = [];
-
-            foreach (ISessionMessage sessionMessage in session.Messages)
-            {
-                ChatMessage chatMessage = sessionMessage switch
-                {
-                    SystemMessage message => new SystemChatMessage(message.Content),
-                    UserMessage message => new UserChatMessage(message.Content),
-                    AssistantMessage message => new AssistantChatMessage(message.Content),
-                    ToolCallMessage message => new AssistantChatMessage([ChatToolCall.CreateFunctionToolCall(message.ToolId, message.ToolName, BinaryData.FromString(message.Arguments))]),
-                    ToolResultMessage message => new ToolChatMessage(message.ToolId, message.Result),
-                    _ => throw new InvalidOperationException($"Unknown message type: {sessionMessage.GetType().Name}")
-                };
-                messages.Add(chatMessage);
-            }
-
-            ChatResponse chatResponse = await chatClient.ChatAsync([.. messages], cancellationToken);
+            ChatResponse chatResponse = await chatClient.ChatAsync([.. session.Messages], cancellationToken);
             session.RecordThought(chatResponse.Content);
 
             if (chatResponse.ToolCalls.Count > 0)
