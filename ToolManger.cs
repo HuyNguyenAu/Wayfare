@@ -17,7 +17,6 @@ internal interface IToolManager
     public Exception[] Errors { get; }
 
     Task LoadToolsAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken);
-    ITool GetTool(string name);
 }
 
 internal sealed class ToolManager : IToolManager
@@ -33,14 +32,6 @@ internal sealed class ToolManager : IToolManager
 
         Tools = loadToolsResult.Tools;
         Errors = loadToolsResult.Errors;
-    }
-
-    public ITool GetTool(string name)
-    {
-        ITool? tool = Tools.FirstOrDefault(tool => tool.Name == name)
-            ?? throw new KeyNotFoundException($"No tool found with name '{name}'");
-        
-        return tool;
     }
 
     private async Task<LoadToolsResult> LoadToolsFromDirectoryAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken)

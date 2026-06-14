@@ -15,9 +15,9 @@ public class Program
         });
         OpenAIClient openAIClient = new(chatClient);
 
-        Session session = new();
         ToolManager toolManager = new();
-        Engine engine = new(session, toolManager, openAIClient);
+        Session session = new(toolManager);
+        Engine engine = new(session, openAIClient);
 
         CancellationTokenSource cancellationTokenSource = new();
         Console.CancelKeyPress += (sender, eventArgs) =>

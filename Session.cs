@@ -1,3 +1,6 @@
+using System.Text;
+using WayFare.Tools;
+
 namespace WayFare;
 
 internal interface ISessionMessage;
@@ -17,12 +20,22 @@ internal interface ISession
     void RequestAction(string ToolId, string Name, string Args);
     void RecordObservation(string ToolId, string Name, string Result);
     void Finish();
+
+    ITool GetTool(string name);
 }
 
 internal class Session : ISession
 {
     public State State { get; private set; } = State.Idle;
-    public List<ISessionMessage> Messages { get; } = [];
+    public List<ISessionMessage> Messages { get; private set; }
+
+    private readonly IToolManager _toolManager;
+
+    public Session(IToolManager toolManager)
+    {
+        _toolManager = toolManager;
+        Messages = [new SystemMessage(SystemPrompt())];
+    }
 
     public void BeginThinking(string userInput)
     {
@@ -61,6 +74,14 @@ internal class Session : ISession
         State = State.Done;
     }
 
+    public ITool GetTool(string name)
+    {
+        ITool? tool = _toolManager.Tools.FirstOrDefault(tool => tool.Name == name)
+            ?? throw new KeyNotFoundException($"No tool found with name '{name}'");
+
+        return tool;
+    }
+
     private void EnsureState(params State[] expected)
     {
         if (expected.Contains(State))
@@ -69,5 +90,35 @@ internal class Session : ISession
         }
 
         throw new InvalidOperationException($"Expected states {string.Join(", ", expected)}, but was {State}");
+    }
+
+    private string SystemPrompt()
+    {
+        StringBuilder promptBuilder = new();
+
+        promptBuilder.AppendLine("You are a coding agent harness. You help users by reading and editing files.");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Available tools:");
+
+        foreach (ITool tool in _toolManager.Tools)
+        {
+            promptBuilder.AppendLine($"- {tool.Name}: {tool.Description}");
+        }
+
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Rules:");
+        promptBuilder.AppendLine("- To see what files exist, use list or find.");
+        promptBuilder.AppendLine("- To read a file, use read_file.");
+        promptBuilder.AppendLine("- To edit a file, use replace. The oldText must match exactly what is in the file, including whitespace.");
+        promptBuilder.AppendLine("- The oldText in replace must appear exactly once in the file. If it appears more than once, add more surrounding lines to make it unique.");
+        promptBuilder.AppendLine("- To create a new file or completely overwrite one, use write_file.");
+        promptBuilder.AppendLine("- Always read a file before editing it.");
+        promptBuilder.AppendLine("- Keep responses short. Show file paths when working with files.");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine($"Current date: {DateTime.UtcNow:yyyy-MM-dd HH:mm UTC}");
+        promptBuilder.AppendLine($"Current operating system: {Environment.OSVersion}");
+        promptBuilder.AppendLine($"Current working directory: {Directory.GetCurrentDirectory()}");
+
+        return promptBuilder.ToString();
     }
 }

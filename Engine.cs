@@ -8,7 +8,7 @@ internal interface IEngine
     Task RunAsync(CancellationToken cancellationToken);
 }
 
-internal class Engine(ISession session, IToolManager toolManager, IChatClient chatClient) : IEngine
+internal class Engine(ISession session, IChatClient chatClient) : IEngine
 {
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -28,7 +28,7 @@ internal class Engine(ISession session, IToolManager toolManager, IChatClient ch
 
                     try
                     {
-                        ITool tool = toolManager.GetTool(toolCall.ToolId);
+                        ITool tool = session.GetTool(toolCall.ToolId);
                         ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
 
                         if (result.Success)
