@@ -22,10 +22,12 @@ internal interface ISession
     void RecordThought(string content);
     void RequestAction(ToolCall[] toolCalls);
     void RecordObservation(ToolResult[] toolResults);
+    void ResumeThinking();
     void Finish();
     void Reset();
 
     ITool GetTool(string name);
+    ITool[] GetTools();
 }
 
 internal class Session : ISession
@@ -72,6 +74,12 @@ internal class Session : ISession
         Messages.Add(new ToolResultMessage(toolResults));
     }
 
+    public void ResumeThinking()
+    {
+        EnsureState(State.Observing);
+        State = State.Thinking;
+    }
+
     public void Finish()
     {
         EnsureState(State.Thinking, State.Observing);
@@ -91,6 +99,11 @@ internal class Session : ISession
             ?? throw new KeyNotFoundException($"No tool found with name '{name}'");
 
         return tool;
+    }
+
+    public ITool[] GetTools()
+    {
+        return _toolManager.Tools;
     }
 
     private void EnsureState(params State[] expected)

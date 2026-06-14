@@ -24,7 +24,7 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
 
         while (session.State != State.Done && !cancellationToken.IsCancellationRequested)
         {
-            ChatResponse chatResponse = await chatClient.ChatAsync([.. session.Messages], cancellationToken);
+            ChatResponse chatResponse = await chatClient.ChatAsync([.. session.Messages], [.. session.GetTools()], cancellationToken);
             session.RecordThought(chatResponse.Content);
 
             if (chatResponse.ToolCalls.Length > 0)
@@ -35,6 +35,8 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
                 Task<ToolResult>[] executionTasks = [.. toolCalls.Select(toolCall => ExecuteToolAsync(toolCall, cancellationToken))];
                 ToolResult[] toolResults = await Task.WhenAll(executionTasks);
                 session.RecordObservation([.. toolResults]);
+                
+                session.ResumeThinking();
             }
             // Not all models return a tool calls reason. Some will use finish reason stop or length to hand back
             // control to the user. So the true stop condition is when there are no tool calls and the finish

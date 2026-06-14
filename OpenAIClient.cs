@@ -1,5 +1,6 @@
 using System.Text;
 using OpenAI.Chat;
+using WayFare.Tools;
 
 namespace WayFare;
 
@@ -16,25 +17,18 @@ internal record ChatResponse(string Content, ChatToolCall[] ToolCalls, ChatFinis
 
 internal interface IChatClient
 {
-    Task<ChatResponse> ChatAsync(ISessionMessage[] messages, CancellationToken cancellationToken);
+    Task<ChatResponse> ChatAsync(ISessionMessage[] messages, ITool[] tools, CancellationToken cancellationToken);
 }
 
 internal class OpenAIClient(ChatClient client) : IChatClient
 {
-    private readonly ChatCompletionOptions options = new()
-    {
-        AllowParallelToolCalls = false
-    };
-
-    public async Task<ChatResponse> ChatAsync(ISessionMessage[] sessionMessages, CancellationToken cancellationToken)
+    public async Task<ChatResponse> ChatAsync(ISessionMessage[] sessionMessages, ITool[] tools, CancellationToken cancellationToken)
     {
         OpenAI.Chat.ChatFinishReason? chatFinishReason = null;
         StringBuilder assembledContent = new();
         Dictionary<int, ToolCallBuilder> toolCalls = [];
 
-        ChatMessage[] messages = MapSessionMessagesToChatMessages(sessionMessages);
-
-        await foreach (StreamingChatCompletionUpdate chatCompletionUpdate in client.CompleteChatStreamingAsync(messages, options, cancellationToken))
+        await foreach (StreamingChatCompletionUpdate chatCompletionUpdate in client.CompleteChatStreamingAsync(MapSessionMessagesToChatMessages(sessionMessages), CreateChatCompletionOptions(tools), cancellationToken))
         {
             foreach (ChatMessageContentPart part in chatCompletionUpdate.ContentUpdate)
             {
@@ -63,6 +57,21 @@ internal class OpenAIClient(ChatClient client) : IChatClient
         }
 
         return new(assembledContent.ToString(), [.. assembledToolCalls], MapFinishReason(chatFinishReason));
+    }
+
+    private static ChatCompletionOptions CreateChatCompletionOptions(ITool[] tools)
+    {
+        ChatCompletionOptions options = new()
+        {
+            AllowParallelToolCalls = false,
+        };
+        
+        foreach (ITool tool in tools)
+        {
+            options.Tools.Add(ChatTool.CreateFunctionTool(tool.Name, tool.Description));
+        }
+
+        return options;
     }
 
     private static ChatMessage[] MapSessionMessagesToChatMessages(ISessionMessage[] sessionMessages)
