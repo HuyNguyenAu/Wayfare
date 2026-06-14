@@ -82,7 +82,7 @@ internal class Session : ISession
     {
         EnsureState(State.Done);
         State = State.Idle;
-        Messages = [new SystemMessage(SystemPrompt())];
+        Messages[0] = new SystemMessage(SystemPrompt());
     }
 
     public ITool GetTool(string name)
