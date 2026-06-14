@@ -3,12 +3,15 @@ using WayFare.Tools;
 
 namespace WayFare;
 
+internal record ToolCall(string ToolId, string Name, string Arguments);
+internal record ToolResult(string ToolId, string ToolName, string Result);
+
 internal interface ISessionMessage;
 internal record SystemMessage(string Content) : ISessionMessage;
 internal record UserMessage(string Content) : ISessionMessage;
 internal record AssistantMessage(string Content) : ISessionMessage;
-internal record ToolCallMessage(string ToolId, string ToolName, string Arguments) : ISessionMessage;
-internal record ToolResultMessage(string ToolId, string ToolName, string Result) : ISessionMessage;
+internal record ToolCallMessage(ToolCall[] ToolCalls) : ISessionMessage;
+internal record ToolResultMessage(ToolResult[] ToolResults) : ISessionMessage;
 
 internal interface ISession
 {
@@ -17,8 +20,8 @@ internal interface ISession
 
     void BeginThinking(string userInput);
     void RecordThought(string content);
-    void RequestAction(string ToolId, string Name, string Args);
-    void RecordObservation(string ToolId, string Name, string Result);
+    void RequestAction(ToolCall[] toolCalls);
+    void RecordObservation(ToolResult[] toolResults);
     void Finish();
 
     ITool GetTool(string name);
@@ -52,20 +55,20 @@ internal class Session : ISession
         Messages.Add(new AssistantMessage(content));
     }
 
-    public void RequestAction(string toolId, string name, string args)
+    public void RequestAction(ToolCall[] toolCalls)
     {
         EnsureState(State.Thinking);
         State = State.Acting;
 
-        Messages.Add(new ToolCallMessage(toolId, name, args));
+        Messages.Add(new ToolCallMessage(toolCalls));
     }
 
-    public void RecordObservation(string toolId, string name, string result)
+    public void RecordObservation(ToolResult[] toolResults)
     {
         EnsureState(State.Acting);
         State = State.Observing;
 
-        Messages.Add(new ToolResultMessage(toolId, name, result));
+        Messages.Add(new ToolResultMessage(toolResults));
     }
 
     public void Finish()

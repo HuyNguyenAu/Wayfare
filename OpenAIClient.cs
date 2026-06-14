@@ -3,7 +3,7 @@ using OpenAI.Chat;
 
 namespace WayFare;
 
-internal enum FinishReason
+internal enum ChatFinishReason
 {
     Stop,
     Length,
@@ -11,8 +11,8 @@ internal enum FinishReason
     ToolCalls,
 }
 
-internal record ToolCall(string ToolId, string Name, string Arguments);
-internal record ChatResponse(string Content, List<ToolCall> ToolCalls, FinishReason FinishReason);
+internal record ChatToolCall(string ToolId, string Name, string Arguments);
+internal record ChatResponse(string Content, ChatToolCall[] ToolCalls, ChatFinishReason FinishReason);
 
 internal interface IChatClient
 {
@@ -28,25 +28,11 @@ internal class OpenAIClient(ChatClient client) : IChatClient
 
     public async Task<ChatResponse> ChatAsync(ISessionMessage[] sessionMessages, CancellationToken cancellationToken)
     {
-        ChatFinishReason? chatFinishReason = null;
+        OpenAI.Chat.ChatFinishReason? chatFinishReason = null;
         StringBuilder assembledContent = new();
         Dictionary<int, ToolCallBuilder> toolCalls = [];
 
-        List<ChatMessage> messages = [];
-
-        foreach (ISessionMessage sessionMessage in sessionMessages)
-        {
-            ChatMessage chatMessage = sessionMessage switch
-            {
-                SystemMessage message => new SystemChatMessage(message.Content),
-                UserMessage message => new UserChatMessage(message.Content),
-                AssistantMessage message => new AssistantChatMessage(message.Content),
-                ToolCallMessage message => new AssistantChatMessage([ChatToolCall.CreateFunctionToolCall(message.ToolId, message.ToolName, BinaryData.FromString(message.Arguments))]),
-                ToolResultMessage message => new ToolChatMessage(message.ToolId, message.Result),
-                _ => throw new InvalidOperationException($"Unknown message type: {sessionMessage.GetType().Name}")
-            };
-            messages.Add(chatMessage);
-        }
+        ChatMessage[] messages = MapSessionMessagesToChatMessages(sessionMessages);
 
         await foreach (StreamingChatCompletionUpdate chatCompletionUpdate in client.CompleteChatStreamingAsync(messages, options, cancellationToken))
         {
@@ -88,28 +74,49 @@ internal class OpenAIClient(ChatClient client) : IChatClient
             }
         }
 
-        List<ToolCall> assembledToolCalls = [];
-
-        foreach (ToolCallBuilder toolCall in toolCalls.Values)
-        {
-            assembledToolCalls.Add(new ToolCall(toolCall.ToolId.ToString(), toolCall.Name.ToString(), toolCall.Args.ToString()));
-        }
+        ChatToolCall[] assembledToolCalls = [.. toolCalls.Values.Select(toolCall => new ChatToolCall(toolCall.ToolId.ToString(), toolCall.Name.ToString(), toolCall.Args.ToString()))];
 
         if (chatFinishReason is null)
         {
             throw new InvalidOperationException("Chat completion did not provide a finish reason.");
         }
 
-        FinishReason finishReason = chatFinishReason switch
-        {
-            ChatFinishReason.Stop => FinishReason.Stop,
-            ChatFinishReason.Length => FinishReason.Length,
-            ChatFinishReason.ContentFilter => FinishReason.ContentFilter,
-            ChatFinishReason.ToolCalls => FinishReason.ToolCalls,
-            _ => throw new InvalidOperationException($"Unexpected finish reason: {chatFinishReason}")
-        };
+        return new(assembledContent.ToString(), [.. assembledToolCalls], MapFinishReason(chatFinishReason));
+    }
 
-        return new(assembledContent.ToString(), assembledToolCalls, finishReason);
+    private static ChatMessage[] MapSessionMessagesToChatMessages(ISessionMessage[] sessionMessages)
+    {
+        List<ChatMessage> chatMessages = [];
+
+        foreach (ISessionMessage sessionMessage in sessionMessages)
+        {
+            ChatMessage[] mappedMessages = sessionMessage switch
+            {
+                SystemMessage message => [new SystemChatMessage(message.Content)],
+                UserMessage message => [new UserChatMessage(message.Content)],
+                AssistantMessage message => [new AssistantChatMessage(message.Content)],
+                ToolCallMessage message => [new AssistantChatMessage(message.ToolCalls.Select(toolCall => OpenAI.Chat.ChatToolCall.CreateFunctionToolCall(toolCall.ToolId, toolCall.Name, BinaryData.FromString(toolCall.Arguments))))],
+                ToolResultMessage message => [.. message.ToolResults.Select(toolResult => new ToolChatMessage(toolResult.ToolId, toolResult.Result))],
+                _ => throw new InvalidOperationException($"Unknown message type: {sessionMessage.GetType().Name}")
+            };
+
+            chatMessages.AddRange(mappedMessages);
+        }
+
+        return [.. chatMessages];
+    }
+
+    private static ChatFinishReason MapFinishReason(OpenAI.Chat.ChatFinishReason? finishReason)
+    {
+        return finishReason switch
+        {
+            OpenAI.Chat.ChatFinishReason.Stop => ChatFinishReason.Stop,
+            OpenAI.Chat.ChatFinishReason.Length => ChatFinishReason.Length,
+            OpenAI.Chat.ChatFinishReason.ContentFilter => ChatFinishReason.ContentFilter,
+            OpenAI.Chat.ChatFinishReason.ToolCalls => ChatFinishReason.ToolCalls,
+            null => throw new InvalidOperationException("Chat completion did not provide a finish reason."),
+            _ => throw new InvalidOperationException($"Unexpected finish reason: {finishReason}")
+        };
     }
 
     private sealed class ToolCallBuilder
