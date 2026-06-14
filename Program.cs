@@ -26,7 +26,7 @@ public class Program
             cancellationTokenSource.Cancel();
         };
 
-        await toolManager.LoadToolsAsync("Tools", "*.cs", @"C:\Users\Kaze\source\repos\Wayfare\CompiledTools", cancellationTokenSource.Token);
+        await toolManager.LoadToolsAsync(@"C:\Users\Kaze\source\repos\Wayfare\Tools", "*.cs", @"C:\Users\Kaze\source\repos\Wayfare\CompiledTools", cancellationTokenSource.Token);
 
         try
         {
