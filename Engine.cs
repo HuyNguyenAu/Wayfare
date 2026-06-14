@@ -11,6 +11,14 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
 {
     public async Task RunAsync(CancellationToken cancellationToken)
     {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await RunCycleAsync(cancellationToken);
+        }
+    }
+
+    private async Task RunCycleAsync(CancellationToken cancellationToken)
+    {
         string userInput = await Console.In.ReadLineAsync(cancellationToken) ?? string.Empty;
         session.BeginThinking(userInput);
 
@@ -36,6 +44,8 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
                 session.Finish();
             }
         }
+
+        session.Reset();
     }
 
     private async Task<ToolResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken)

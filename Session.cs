@@ -23,6 +23,7 @@ internal interface ISession
     void RequestAction(ToolCall[] toolCalls);
     void RecordObservation(ToolResult[] toolResults);
     void Finish();
+    void Reset();
 
     ITool GetTool(string name);
 }
@@ -77,6 +78,13 @@ internal class Session : ISession
         State = State.Done;
     }
 
+    public void Reset()
+    {
+        EnsureState(State.Done);
+        State = State.Idle;
+        Messages = [new SystemMessage(SystemPrompt())];
+    }
+
     public ITool GetTool(string name)
     {
         ITool? tool = _toolManager.Tools.FirstOrDefault(tool => tool.Name == name)
@@ -92,7 +100,7 @@ internal class Session : ISession
             return;
         }
 
-        throw new InvalidOperationException($"Expected states {string.Join(", ", expected)}, but was {State}");
+        throw new InvalidOperationException($"Expected one of the states {string.Join(" or ", expected)}, but was {State}");
     }
 
     private string SystemPrompt()
