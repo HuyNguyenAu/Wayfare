@@ -54,7 +54,7 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
     {
         try
         {
-            ITool tool = session.GetTool(toolCall.ToolId);
+            ITool tool = session.GetTool(toolCall.Name);
             ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
 
             if (result.Success)
