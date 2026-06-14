@@ -3,6 +3,15 @@ using WayFare.Tools;
 
 namespace WayFare;
 
+internal enum State
+{
+    Idle,
+    Thinking,
+    Acting,
+    Observing,
+    Done,
+}
+
 internal record ToolCall(string ToolId, string Name, string Arguments);
 internal record ToolResult(string ToolId, string ToolName, string Result);
 
