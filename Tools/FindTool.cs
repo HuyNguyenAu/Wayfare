@@ -53,7 +53,7 @@ internal sealed class FindTool(IToolHelpers toolHelpers) : ITool
         }
         catch (Exception ex)
         {
-            return new ToolExecutionResult(false, string.Empty, $"Failed to execute find because {ex.Message}", ex);
+            return new ToolExecutionResult(false, string.Empty, $"Failed to execute find because {ex}", ex);
         }
     }
 

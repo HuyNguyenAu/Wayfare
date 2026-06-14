@@ -52,7 +52,7 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
         }
         catch (Exception ex)
         {
-            return new ToolExecutionResult(false, string.Empty, "Failed to execute command", ex);
+            return new ToolExecutionResult(false, string.Empty, $"Failed to execute command '{executeCommandArguments.Command}' because {ex}", ex);
         }
     }
 

@@ -27,27 +27,34 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
             return new ToolExecutionResult(false, string.Empty, "Failed to replace text: 'oldText' is required and cannot be empty");
         }
 
-        string content = await File.ReadAllTextAsync(resolvedPath, cancellationToken);
-
-        int index = content.IndexOf(replaceArguments.OldText, StringComparison.Ordinal);
-
-        if (index == -1)
+        try
         {
-            return new ToolExecutionResult(false, string.Empty, $"Failed to replace text: 'oldText' not found in '{replaceArguments.Path}'. It must match the file exactly, including whitespace and line endings. Read the file first to confirm the exact text");
+            string content = await File.ReadAllTextAsync(resolvedPath, cancellationToken);
+
+            int index = content.IndexOf(replaceArguments.OldText, StringComparison.Ordinal);
+
+            if (index == -1)
+            {
+                return new ToolExecutionResult(false, string.Empty, $"Failed to replace text: 'oldText' not found in '{replaceArguments.Path}'. It must match the file exactly, including whitespace and line endings. Read the file first to confirm the exact text");
+            }
+
+            int lastIndex = content.LastIndexOf(replaceArguments.OldText, StringComparison.Ordinal);
+
+            if (index != lastIndex)
+            {
+                return new ToolExecutionResult(false, string.Empty, $"Failed to replace text: 'oldText' appears more than once in '{replaceArguments.Path}'. Add more surrounding lines to make it unique");
+            }
+
+            string newContent = content.Remove(index, replaceArguments.OldText.Length).Insert(index, replaceArguments.NewText ?? string.Empty);
+
+            await File.WriteAllTextAsync(resolvedPath, newContent, cancellationToken);
+
+            return new ToolExecutionResult(true, $"Successfully replaced text in '{replaceArguments.Path}'", string.Empty);
         }
-
-        int lastIndex = content.LastIndexOf(replaceArguments.OldText, StringComparison.Ordinal);
-
-        if (index != lastIndex)
+        catch (Exception ex)
         {
-            return new ToolExecutionResult(false, string.Empty, $"Failed to replace text: 'oldText' appears more than once in '{replaceArguments.Path}'. Add more surrounding lines to make it unique");
+            return new ToolExecutionResult(false, string.Empty, $"Failed to replace text because {ex}", ex);
         }
-
-        string newContent = content.Remove(index, replaceArguments.OldText.Length).Insert(index, replaceArguments.NewText ?? string.Empty);
-
-        await File.WriteAllTextAsync(resolvedPath, newContent, cancellationToken);
-
-        return new ToolExecutionResult(true, $"Successfully replaced text in '{replaceArguments.Path}'", string.Empty);
     }
 
     internal record ReplaceArguments(string Path, string OldText, string NewText);

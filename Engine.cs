@@ -44,7 +44,7 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
                     }
                     catch (Exception ex)
                     {
-                        toolResults.Add(new ToolResult(toolCall.ToolId, toolCall.Name, $"Exception occurred while executing tool '{toolCall.Name}' because {ex.Message}"));
+                        toolResults.Add(new ToolResult(toolCall.ToolId, toolCall.Name, $"Exception occurred while executing tool '{toolCall.Name}' because {ex}"));
                     }
                 }
 

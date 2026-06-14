@@ -45,7 +45,7 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
         }
         catch (Exception ex)
         {
-            return new ToolExecutionResult(false, string.Empty, $"Failed to execute list because {ex.Message}", ex);
+            return new ToolExecutionResult(false, string.Empty, $"Failed to execute list because {ex}", ex);
         }
     }
 

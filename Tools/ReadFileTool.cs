@@ -22,10 +22,17 @@ internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
             return new ToolExecutionResult(false, string.Empty, $"Failed to read file because file does not exist at path '{readFileArguments.Path}'");
         }
 
-        string[] lines = await File.ReadAllLinesAsync(resolvedPath, cancellationToken);
-        string[] slice = [.. lines.Skip(readFileArguments.Offset).Take(readFileArguments.Limit)];
+        try
+        {
+            string[] lines = await File.ReadAllLinesAsync(resolvedPath, cancellationToken);
+            string[] slice = [.. lines.Skip(readFileArguments.Offset).Take(readFileArguments.Limit)];
 
-        return new ToolExecutionResult(true, string.Join(Environment.NewLine, slice), string.Empty);
+            return new ToolExecutionResult(true, string.Join(Environment.NewLine, slice), string.Empty);
+        }
+        catch (Exception ex)
+        {
+            return new ToolExecutionResult(false, string.Empty, $"Failed to read file because {ex}", ex);
+        }
     }
 
     internal record ReadFileArguments(string Path, int Offset = 0, int Limit = 2000);

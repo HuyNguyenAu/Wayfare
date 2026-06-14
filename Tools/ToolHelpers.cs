@@ -43,7 +43,7 @@ public class ToolHelpers : IToolHelpers
         catch (Exception ex)
         {
             args = default;
-            errorMessage = $"Failed to parse arguments: {ex.Message}";
+            errorMessage = $"Failed to parse arguments: {ex}";
 
             return false;
         }
