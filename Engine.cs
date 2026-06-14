@@ -24,27 +24,7 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
                 ToolCall[] toolCalls = [.. chatResponse.ToolCalls.Select(toolCall => new ToolCall(toolCall.ToolId, toolCall.Name, toolCall.Arguments))];
                 session.RequestAction(toolCalls);
 
-                Task<ToolResult>[] executionTasks = [.. toolCalls.Select(async toolCall =>
-                    {
-                        try
-                        {
-                            ITool tool = session.GetTool(toolCall.ToolId);
-                            ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
-
-                            if (result.Success)
-                            {
-                                return new ToolResult(toolCall.ToolId, toolCall.Name, result.Result);
-                            }
-                            else
-                            {
-                                return new ToolResult(toolCall.ToolId, toolCall.Name, $"Failed to execute tool '{toolCall.Name}' because {result.Error}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            return new ToolResult(toolCall.ToolId, toolCall.Name, $"Exception occurred while executing tool '{toolCall.Name}' because {ex}");
-                        }
-                    })];
+                Task<ToolResult>[] executionTasks = [.. toolCalls.Select(toolCall => ExecuteToolAsync(toolCall, cancellationToken))];
                 ToolResult[] toolResults = await Task.WhenAll(executionTasks);
                 session.RecordObservation([.. toolResults]);
             }
@@ -55,6 +35,28 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
             {
                 session.Finish();
             }
+        }
+    }
+
+    private async Task<ToolResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        try
+        {
+            ITool tool = session.GetTool(toolCall.ToolId);
+            ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
+
+            if (result.Success)
+            {
+                return new ToolResult(toolCall.ToolId, toolCall.Name, result.Result);
+            }
+            else
+            {
+                return new ToolResult(toolCall.ToolId, toolCall.Name, $"Failed to execute tool '{toolCall.Name}' because {result.Error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            return new ToolResult(toolCall.ToolId, toolCall.Name, $"Exception occurred while executing tool '{toolCall.Name}' because {ex}");
         }
     }
 }
