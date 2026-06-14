@@ -47,26 +47,7 @@ internal class OpenAIClient(ChatClient client) : IChatClient
                 Console.Write(part.Text);
             }
 
-            foreach (StreamingChatToolCallUpdate toolCallUpdate in chatCompletionUpdate.ToolCallUpdates)
-            {
-                if (!toolCalls.TryGetValue(toolCallUpdate.Index, out ToolCallBuilder? toolCall))
-                {
-                    toolCall = new ToolCallBuilder();
-                    toolCalls[toolCallUpdate.Index] = toolCall;
-                }
-
-                if (!string.IsNullOrEmpty(toolCallUpdate.ToolCallId))
-                {
-                    toolCall.ToolId.Append(toolCallUpdate.ToolCallId);
-                }
-
-                if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
-                {
-                    toolCall.Name.Append(toolCallUpdate.FunctionName);
-                }
-
-                toolCall.Args.Append(toolCallUpdate.FunctionArgumentsUpdate);
-            }
+            HandleToolCallUpdate([.. chatCompletionUpdate.ToolCallUpdates], toolCalls);
 
             if (chatCompletionUpdate.FinishReason is not null)
             {
@@ -117,6 +98,30 @@ internal class OpenAIClient(ChatClient client) : IChatClient
             null => throw new InvalidOperationException("Chat completion did not provide a finish reason."),
             _ => throw new InvalidOperationException($"Unexpected finish reason: {finishReason}")
         };
+    }
+
+    private static void HandleToolCallUpdate(StreamingChatToolCallUpdate[] toolCallUpdates, Dictionary<int, ToolCallBuilder> toolCalls)
+    {
+        foreach (StreamingChatToolCallUpdate toolCallUpdate in toolCallUpdates)
+        {
+            if (!toolCalls.TryGetValue(toolCallUpdate.Index, out ToolCallBuilder? toolCall))
+            {
+                toolCall = new ToolCallBuilder();
+                toolCalls[toolCallUpdate.Index] = toolCall;
+            }
+
+            if (!string.IsNullOrEmpty(toolCallUpdate.ToolCallId))
+            {
+                toolCall.ToolId.Append(toolCallUpdate.ToolCallId);
+            }
+
+            if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
+            {
+                toolCall.Name.Append(toolCallUpdate.FunctionName);
+            }
+
+            toolCall.Args.Append(toolCallUpdate.FunctionArgumentsUpdate);
+        }
     }
 
     private sealed class ToolCallBuilder
