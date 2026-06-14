@@ -2,7 +2,7 @@ namespace WayFare.Tools;
 
 internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
 {
-    public string Name => "Read File";
+    public string Name => "read";
     public string Description => "Read lines from a file and return them as text. Parameters: path (string, required), offset (int, optional - first line to return, 0-based, default 0), limit (int, optional - maximum number of lines to return, default 2000). If the file has more lines than limit, call again with a higher offset to read the rest.";
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)

@@ -2,7 +2,7 @@ namespace WayFare.Tools;
 
 internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
 {
-    public string Name => "Write File";
+    public string Name => "write";
     public string Description => "Write content to a file, creating it if it does not exist or overwriting it if it does. Use this only for new files or full rewrites. To make targeted edits to an existing file, use replace instead. Parameters: path (string, required), content (string, required - the full content to write).";
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)

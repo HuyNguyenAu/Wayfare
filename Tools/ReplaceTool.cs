@@ -2,7 +2,7 @@ namespace WayFare.Tools;
 
 internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
 {
-    public string Name => "Replace";
+    public string Name => "replace";
     public string Description => "Replace a block of text in a file. 'oldText' must match the file exactly (including whitespace and line endings) and must appear exactly once. If it appears more than once, include more surrounding lines to make it unique. Parameters: path (string, required), oldText (string, required - the exact text to find), newText (string, required - the text to replace it with).";
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)

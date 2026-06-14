@@ -2,7 +2,7 @@ namespace WayFare.Tools;
 
 internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
 {
-    public string Name => "List";
+    public string Name => "list";
     public string Description => "List the files and directories inside a directory. Directory names end with a path separator. Parameters: path (string, required - the directory to list)";
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)

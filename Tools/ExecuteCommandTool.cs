@@ -4,7 +4,7 @@ namespace WayFare.Tools;
 
 internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 {
-    public string Name => "Execute Command";
+    public string Name => "execute";
     public string Description => "Execute a CLI command. Parameters: command (string, required - the executable or command to run), arguments (string, optional - the arguments for the command)";
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
