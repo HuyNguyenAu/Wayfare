@@ -9,6 +9,13 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
+        CancellationTokenSource cancellationTokenSource = new();
+        Console.CancelKeyPress += (sender, eventArgs) =>
+        {
+            eventArgs.Cancel = true;
+            cancellationTokenSource.Cancel();
+        };
+
         ChatClient chatClient = new("MODEL_NAME", new ApiKeyCredential("local-no-key-needed"), new OpenAIClientOptions()
         {
             Endpoint = new Uri("http://127.0.0.1:8080/")
@@ -16,17 +23,10 @@ public class Program
         OpenAIClient openAIClient = new(chatClient);
 
         AgentEventHub agentEventHub = new();
-        TerminalUI terminalUI = new(agentEventHub);
+        TerminalUI terminalUI = new(agentEventHub, cancellationTokenSource.Token);
         ToolManager toolManager = new(agentEventHub);
         Session session = new(toolManager);
         Engine engine = new(session, openAIClient, agentEventHub);
-
-        CancellationTokenSource cancellationTokenSource = new();
-        Console.CancelKeyPress += (sender, eventArgs) =>
-        {
-            eventArgs.Cancel = true;
-            cancellationTokenSource.Cancel();
-        };
 
         await terminalUI.Startup(cancellationTokenSource.Token);
         await toolManager.LoadToolsAsync(@"C:\Users\Kaze\source\repos\Wayfare\Tools", "*.cs", @"C:\Users\Kaze\source\repos\Wayfare\compiled", cancellationTokenSource.Token);
@@ -44,7 +44,12 @@ public class Program
         }
         catch (OperationCanceledException)
         {
-            Console.WriteLine("Application is shutting down...");
+        }
+        finally
+        {
+            cancellationTokenSource.Cancel();
+            cancellationTokenSource.Dispose();
+            terminalUI.Dispose();
         }
     }
 }

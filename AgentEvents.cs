@@ -1,63 +1,36 @@
-using System.Collections.Concurrent;
+using System.Threading.Channels;
 
 namespace WayFare;
 
+internal interface IAgentEvent;
+
 // Tool loading events
-internal record LoadingToolsStarted();
-internal record ToolCompilationStarted(string ToolName);
-internal record ToolCompilationCompleted();
-internal record ToolLoadingStarted(string ToolName);
-internal record ToolLoadingCompleted();
+internal record LoadingToolsStarted() : IAgentEvent;
+internal record ToolCompilationStarted(string ToolName) : IAgentEvent;
+internal record ToolCompilationCompleted() : IAgentEvent;
+internal record ToolLoadingStarted(string ToolName) : IAgentEvent;
+internal record ToolLoadingCompleted() : IAgentEvent;
 
 // Agent execution events
-internal record ChatRequestStarted(string Description);
-internal record ChatRequestCompleted();
-internal record ThoughtChunkReceived(string Message);
-internal record ToolExecutionStarted(string InvocationMessage);
-internal record ToolExecutionCompleted(bool Success, string ToolName, string DisplayMessage, string Result, string Error);
+internal record ChatRequestStarted(string Description) : IAgentEvent;
+internal record ChatRequestCompleted() : IAgentEvent;
+internal record ThoughtChunkReceived(string Message) : IAgentEvent;
+internal record ToolExecutionStarted(string InvocationMessage) : IAgentEvent;
+internal record ToolExecutionCompleted(bool Success, string ToolName, string DisplayMessage, string Result, string Error) : IAgentEvent;
 
 internal interface IEventPublisher
 {
-    void Publish<T>(T @event);
+    void Publish<T>(T @event) where T : IAgentEvent;
 }
 
-internal interface IEventSubscriber
+internal class AgentEventHub : IEventPublisher
 {
-    void Subscribe<T>(Action<T> handler);
-}
+    private readonly Channel<IAgentEvent> _channel = Channel.CreateUnbounded<IAgentEvent>();
 
-internal class AgentEventHub : IEventPublisher, IEventSubscriber
-{
-    private readonly ConcurrentDictionary<Type, List<Delegate>> _handlers = new();
+    public ChannelReader<IAgentEvent> Reader => _channel.Reader;
 
-    public void Publish<T>(T @event)
+    public void Publish<T>(T @event) where T : IAgentEvent
     {
-        if (@event == null) return;
-
-        if (_handlers.TryGetValue(typeof(T), out var handlers))
-        {
-            List<Delegate> targets;
-            lock (handlers)
-            {
-                targets = [.. handlers];
-            }
-
-            foreach (var target in targets)
-            {
-                if (target is Action<T> action)
-                {
-                    action(@event);
-                }
-            }
-        }
-    }
-
-    public void Subscribe<T>(Action<T> handler)
-    {
-        var handlers = _handlers.GetOrAdd(typeof(T), _ => []);
-        lock (handlers)
-        {
-            handlers.Add(handler);
-        }
+        _channel.Writer.TryWrite(@event);
     }
 }
