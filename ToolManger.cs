@@ -19,7 +19,7 @@ internal interface IToolManager
     Task LoadToolsAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken);
 }
 
-internal sealed class ToolManager : IToolManager
+internal sealed class ToolManager(IEventPublisher events) : IToolManager
 {
     private readonly string[] _ignoreFiles = ["ITool.cs", "ToolHelpers.cs"];
 
@@ -64,6 +64,8 @@ internal sealed class ToolManager : IToolManager
             throw new LoadToolException($"Failed to access tool directory '{directoryPath}' with search pattern '{searchPattern}'", ex);
         }
 
+        events.Publish(new LoadingToolsStarted());
+
         List<Exception> errors = [];
 
         foreach (string toolFilePath in toolFilePaths)
@@ -80,7 +82,9 @@ internal sealed class ToolManager : IToolManager
             {
                 try
                 {
+                    events.Publish(new ToolCompilationStarted(toolName));
                     await CompileToolAsync(toolFilePath, dllPath, cancellationToken);
+                    events.Publish(new ToolCompilationCompleted());
                 }
                 catch (Exception ex)
                 {
@@ -95,8 +99,13 @@ internal sealed class ToolManager : IToolManager
         {
             try
             {
+                string toolName = Path.GetFileNameWithoutExtension(dllFilePath);
+                events.Publish(new ToolLoadingStarted(toolName));
+
                 ITool tool = LoadTool(dllFilePath);
                 tools.Add(tool);
+
+                events.Publish(new ToolLoadingCompleted());
             }
             catch (Exception ex)
             {
