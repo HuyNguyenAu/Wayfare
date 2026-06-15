@@ -14,6 +14,7 @@ internal class TerminalUI : ITerminalUI
 {
     private bool _hasPrompted;
     private bool _isFirstThoughtChunk = true;
+    private readonly Lock _consoleLock = new();
 
     public TerminalUI(IEventSubscriber events)
     {
@@ -31,60 +32,84 @@ internal class TerminalUI : ITerminalUI
         events.Subscribe<ToolExecutionCompleted>(OnToolExecutionCompleted);
     }
 
-    private static void OnLoadingToolsStarted()
+    private void OnLoadingToolsStarted()
     {
-        AnsiConsole.MarkupLine("[cyan][[SYSTEM]][/] Initialising system tools...");
+        lock (_consoleLock)
+        {
+            AnsiConsole.MarkupLine("[cyan][[SYSTEM]][/] Initialising system tools...");
+        }
     }
 
-    private static void OnToolCompilationStarted(string toolName)
+    private void OnToolCompilationStarted(string toolName)
     {
-        AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Compiling {toolName}...")}");
+        lock (_consoleLock)
+        {
+            AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Compiling {toolName}...")}");
+        }
     }
 
-    private static void OnToolCompilationCompleted()
+    private void OnToolCompilationCompleted()
     {
-        AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+        lock (_consoleLock)
+        {
+            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+        }
     }
 
-    private static void OnToolLoadingStarted(string toolName)
+    private void OnToolLoadingStarted(string toolName)
     {
-        AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Loading {toolName}...")}");
+        lock (_consoleLock)
+        {
+            AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Loading {toolName}...")}");
+        }
     }
 
-    private static void OnToolLoadingCompleted()
+    private void OnToolLoadingCompleted()
     {
-        AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+        lock (_consoleLock)
+        {
+            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+        }
     }
 
     private void OnThoughtChunkReceived(string message)
     {
-        if (_isFirstThoughtChunk)
+        lock (_consoleLock)
         {
-            AnsiConsole.Markup("[cyan][[SYSTEM]] [/]");
-            _isFirstThoughtChunk = false;
+            if (_isFirstThoughtChunk)
+            {
+                AnsiConsole.Markup("[cyan][[SYSTEM]] [/]");
+                _isFirstThoughtChunk = false;
+            }
+            AnsiConsole.Markup(Markup.Escape(message));
         }
-        AnsiConsole.Markup(Markup.Escape(message));
     }
 
-    private static void OnToolExecutionStarted(string invocationMessage)
+    private void OnToolExecutionStarted(string invocationMessage)
     {
-        AnsiConsole.Markup($"[cyan][[SYSTEM]][/] Running {Markup.Escape(invocationMessage)}");
+        lock (_consoleLock)
+        {
+            AnsiConsole.Markup($"[cyan][[SYSTEM]][/] Running {Markup.Escape(invocationMessage)}");
+        }
     }
 
     private void OnToolExecutionCompleted(ToolExecutionCompleted e)
     {
-        if (e.Success)
+        lock (_consoleLock)
         {
-            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
-            AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
-        }
-        else
-        {
-            AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
-            AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
-        }
+            if (e.Success)
+            {
+                AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+                AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
+            }
+            else
+            {
+                AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
+                AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
+            }
 
-        _isFirstThoughtChunk = true;
+            _isFirstThoughtChunk = true;
+        }
     }
 
     public async Task Startup(CancellationToken cancellationToken)
