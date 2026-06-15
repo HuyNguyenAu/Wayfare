@@ -4,7 +4,7 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
 {
     public string Name => "list";
     public string DisplayName => "List";
-    public string Description => "List the files and directories inside a directory. Directory names end with a path separator. Parameters: path (string, required - the directory to list)";
+    public string Description => "Lists the files and directories within a specified directory. Directory names in the output will end with a path separator. Expects a JSON object with properties: \"path\" (string, required - the relative or absolute path of the directory to list). Example: {\"path\": \".\"}";
 
     public string GetInvocationMessage(string arguments)
     {

@@ -4,7 +4,7 @@ internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
 {
     public string Name => "read";
     public string DisplayName => "Read";
-    public string Description => "Read lines from a file and return them as text. Parameters: path (string, required), offset (int, optional - first line to return, 0-based, default 0), limit (int, optional - maximum number of lines to return, default 2000). If the file has more lines than limit, call again with a higher offset to read the rest.";
+    public string Description => "Reads lines from a file. If the file has more lines than the limit, make subsequent calls with an increased offset. Expects a JSON object with properties: \"path\" (string, required - the path of the file to read), \"offset\" (integer, optional - the 0-based index of the first line to return, defaults to 0), \"limit\" (integer, optional - the maximum number of lines to return, defaults to 2000). Example: {\"path\": \"Program.cs\", \"offset\": 0, \"limit\": 100}";
 
     public string GetInvocationMessage(string arguments)
     {
