@@ -62,8 +62,8 @@ public class ToolHelpers : IToolHelpers
         string baseDirectory = Directory.GetCurrentDirectory();
         string fullPath = Path.GetFullPath(path, baseDirectory);
 
-        bool isSubPath = fullPath.StartsWith($"{baseDirectory}{Path.DirectorySeparatorChar}");
-        bool isSamePath = string.Equals(fullPath, baseDirectory);
+        bool isSubPath = fullPath.StartsWith($"{baseDirectory}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
+        bool isSamePath = string.Equals(fullPath, baseDirectory, StringComparison.OrdinalIgnoreCase);
 
         if (isSubPath || isSamePath)
         {
