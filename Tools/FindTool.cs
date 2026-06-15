@@ -4,7 +4,7 @@ internal sealed class FindTool(IToolHelpers toolHelpers) : ITool
 {
     public string Name => "find";
     public string DisplayName => "Find";
-    public string Description => "Search for files and directories whose name contains 'pattern' (case-insensitive substring match). Returns matching paths, one per line. Parameters: pattern path (string, optional - directory to search in, defaults to current directory), (string, required - the text to search for in file/directory names)";
+    public string Description => "Searches for files and directories whose name contains the specified pattern (case-insensitive). Returns matching relative paths. Expects a JSON object with properties: \"pattern\" (string, required - substring to search for in file/directory names), \"path\" (string, optional - relative path of the directory to search in, defaults to \".\"). Example: {\"pattern\": \"Program\", \"path\": \".\"}";
 
     public string GetInvocationMessage(string arguments)
     {
