@@ -4,27 +4,23 @@ namespace WayFare;
 
 internal interface IEngine
 {
-    Task RunAsync(CancellationToken cancellationToken);
+    Task RunCycleAsync(string userInput, CancellationToken cancellationToken);
 }
 
-internal class Engine(ISession session, IChatClient chatClient) : IEngine
+internal class Engine(ISession session, IChatClient chatClient, IEventPublisher events) : IEngine
 {
-    public async Task RunAsync(CancellationToken cancellationToken)
+    public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            await RunCycleAsync(cancellationToken);
-        }
-    }
-
-    private async Task RunCycleAsync(CancellationToken cancellationToken)
-    {
-        string userInput = await Console.In.ReadLineAsync(cancellationToken) ?? string.Empty;
         session.BeginThinking(userInput);
 
         while (session.State != State.Done && !cancellationToken.IsCancellationRequested)
         {
-            ChatResponse chatResponse = await chatClient.ChatAsync([.. session.Messages], [.. session.GetTools()], cancellationToken);
+            ChatResponse chatResponse = await chatClient.ChatAsync(
+                [.. session.Messages],
+                [.. session.GetTools()],
+                content => events.Publish(new ThoughtChunkReceived(content)),
+                cancellationToken
+            );
             session.RecordThought(chatResponse.Content);
 
             if (chatResponse.ToolCalls.Length > 0)
@@ -55,7 +51,9 @@ internal class Engine(ISession session, IChatClient chatClient) : IEngine
         try
         {
             ITool tool = session.GetTool(toolCall.Name);
+            events.Publish(new ToolExecutionStarted(tool.GetInvocationMessage(toolCall.Arguments)));
             ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
+            events.Publish(new ToolExecutionCompleted(toolCall.Name, result.DisplayMessage));
 
             if (result.Success)
             {

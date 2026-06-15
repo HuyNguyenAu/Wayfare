@@ -17,12 +17,12 @@ internal record ChatResponse(string Content, ChatToolCall[] ToolCalls, ChatFinis
 
 internal interface IChatClient
 {
-    Task<ChatResponse> ChatAsync(ISessionMessage[] messages, ITool[] tools, CancellationToken cancellationToken);
+    Task<ChatResponse> ChatAsync(ISessionMessage[] messages, ITool[] tools, Action<string> onContentUpdate, CancellationToken cancellationToken);
 }
 
 internal class OpenAIClient(ChatClient client) : IChatClient
 {
-    public async Task<ChatResponse> ChatAsync(ISessionMessage[] sessionMessages, ITool[] tools, CancellationToken cancellationToken)
+    public async Task<ChatResponse> ChatAsync(ISessionMessage[] sessionMessages, ITool[] tools, Action<string> onContentUpdate, CancellationToken cancellationToken)
     {
         OpenAI.Chat.ChatFinishReason? chatFinishReason = null;
         StringBuilder assembledContent = new();
@@ -38,7 +38,7 @@ internal class OpenAIClient(ChatClient client) : IChatClient
                 }
 
                 assembledContent.Append(part.Text);
-                Console.Write(part.Text);
+                onContentUpdate(part.Text);
             }
 
             HandleToolCallUpdate([.. chatCompletionUpdate.ToolCallUpdates], toolCalls);
