@@ -141,10 +141,10 @@ internal class Session : ISession
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("Rules:");
         promptBuilder.AppendLine("- To see what files exist, use list or find.");
-        promptBuilder.AppendLine("- To read a file, use read_file.");
+        promptBuilder.AppendLine("- To read a file, use read.");
         promptBuilder.AppendLine("- To edit a file, use replace. The oldText must match exactly what is in the file, including whitespace.");
         promptBuilder.AppendLine("- The oldText in replace must appear exactly once in the file. If it appears more than once, add more surrounding lines to make it unique.");
-        promptBuilder.AppendLine("- To create a new file or completely overwrite one, use write_file.");
+        promptBuilder.AppendLine("- To create a new file or completely overwrite one, use write.");
         promptBuilder.AppendLine("- Always read a file before editing it.");
         promptBuilder.AppendLine("- Keep responses short. Show file paths when working with files.");
         promptBuilder.AppendLine();
