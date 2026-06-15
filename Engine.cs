@@ -48,26 +48,36 @@ internal class Engine(ISession session, IChatClient chatClient, IEventPublisher 
 
     private async Task<ToolResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken)
     {
+        bool started = false;
+        string toolName = toolCall.Name;
+     
         try
         {
-            ITool tool = session.GetTool(toolCall.Name);
+            ITool tool = session.GetTool(toolName);
             events.Publish(new ToolExecutionStarted(tool.GetInvocationMessage(toolCall.Arguments)));
+            started = true;
             
             ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
-            events.Publish(new ToolExecutionCompleted(result.Success, toolCall.Name, result.DisplayMessage, result.Result, result.Error));
+            events.Publish(new ToolExecutionCompleted(result.Success, toolName, result.DisplayMessage, result.Result, result.Error));
 
             if (result.Success)
             {
-                return new ToolResult(toolCall.ToolId, toolCall.Name, result.Result);
+                return new ToolResult(toolCall.ToolId, toolName, result.Result);
             }
             else
             {
-                return new ToolResult(toolCall.ToolId, toolCall.Name, $"Failed to execute tool '{toolCall.Name}' because {result.Error}");
+                return new ToolResult(toolCall.ToolId, toolName, $"Failed to execute tool '{toolName}' because {result.Error}");
             }
         }
         catch (Exception ex)
         {
-            return new ToolResult(toolCall.ToolId, toolCall.Name, $"Exception occurred while executing tool '{toolCall.Name}' because {ex}");
+            if (!started)
+            {
+                events.Publish(new ToolExecutionStarted($"[{toolName}] [{toolCall.Arguments}]"));
+            }
+          
+            events.Publish(new ToolExecutionCompleted(false, toolName, $"An error occurred: {ex.Message}", string.Empty, ex.ToString()));
+            return new ToolResult(toolCall.ToolId, toolName, $"Exception occurred while executing tool '{toolName}' because {ex}");
         }
     }
 }
