@@ -52,7 +52,22 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
             Task<string> outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
             Task<string> errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
-            await process.WaitForExitAsync(cancellationToken);
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // Ignore
+                }
+                throw;
+            }
 
             string output = await outputTask;
             string error = await errorTask;
