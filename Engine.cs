@@ -15,12 +15,22 @@ internal class Engine(ISession session, IChatClient chatClient, IEventPublisher 
 
         while (session.State != State.Done && !cancellationToken.IsCancellationRequested)
         {
+            string statusDescription = "Compiling decision...";
+            
+            if (session.Messages.LastOrDefault() is ToolResultMessage toolResultMessage)
+            {
+                string[] toolNames = [.. toolResultMessage.ToolResults.Select(r => r.ToolName).Distinct()];
+                statusDescription = $"Processing results from {string.Join(", ", toolNames)}...";
+            }
+
+            events.Publish(new ChatRequestStarted(statusDescription));
             ChatResponse chatResponse = await chatClient.ChatAsync(
                 [.. session.Messages],
                 [.. session.GetTools()],
                 content => events.Publish(new ThoughtChunkReceived(content)),
                 cancellationToken
             );
+            events.Publish(new ChatRequestCompleted());
             session.RecordThought(chatResponse.Content);
 
             if (chatResponse.ToolCalls.Length > 0)

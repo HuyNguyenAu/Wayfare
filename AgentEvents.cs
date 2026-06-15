@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace WayFare;
 
@@ -13,6 +10,8 @@ internal record ToolLoadingStarted(string ToolName);
 internal record ToolLoadingCompleted();
 
 // Agent execution events
+internal record ChatRequestStarted(string Description);
+internal record ChatRequestCompleted();
 internal record ThoughtChunkReceived(string Message);
 internal record ToolExecutionStarted(string InvocationMessage);
 internal record ToolExecutionCompleted(bool Success, string ToolName, string DisplayMessage, string Result, string Error);

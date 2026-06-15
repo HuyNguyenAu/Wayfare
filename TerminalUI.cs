@@ -27,6 +27,8 @@ internal class TerminalUI : ITerminalUI
         events.Subscribe<ToolLoadingStarted>(e => OnToolLoadingStarted(e.ToolName));
         events.Subscribe<ToolLoadingCompleted>(_ => OnToolLoadingCompleted());
 
+        events.Subscribe<ChatRequestStarted>(e => OnChatRequestStarted(e));
+        events.Subscribe<ChatRequestCompleted>(_ => OnChatRequestCompleted());
         events.Subscribe<ThoughtChunkReceived>(e => OnThoughtChunkReceived(e.Message));
         events.Subscribe<ToolExecutionStarted>(e => OnToolExecutionStarted(e.InvocationMessage));
         events.Subscribe<ToolExecutionCompleted>(OnToolExecutionCompleted);
@@ -72,13 +74,34 @@ internal class TerminalUI : ITerminalUI
         }
     }
 
+    private void OnChatRequestStarted(ChatRequestStarted e)
+    {
+        lock (_consoleLock)
+        {
+            AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape(e.Description)}");
+            _isFirstThoughtChunk = true;
+        }
+    }
+
+    private void OnChatRequestCompleted()
+    {
+        lock (_consoleLock)
+        {
+            if (_isFirstThoughtChunk)
+            {
+                AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+                _isFirstThoughtChunk = false;
+            }
+        }
+    }
+
     private void OnThoughtChunkReceived(string message)
     {
         lock (_consoleLock)
         {
             if (_isFirstThoughtChunk)
             {
-                AnsiConsole.Markup("[cyan][[SYSTEM]] [/]");
+                AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
                 _isFirstThoughtChunk = false;
             }
             AnsiConsole.Markup(Markup.Escape(message));
