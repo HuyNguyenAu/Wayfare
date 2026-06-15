@@ -1,4 +1,4 @@
-﻿
+
 using System.ClientModel;
 using OpenAI;
 using OpenAI.Chat;
@@ -15,9 +15,11 @@ public class Program
         });
         OpenAIClient openAIClient = new(chatClient);
 
-        ToolManager toolManager = new();
+        AgentEventHub agentEventHub = new();
+        TerminalUI terminalUI = new(agentEventHub);
+        ToolManager toolManager = new(agentEventHub);
         Session session = new(toolManager);
-        Engine engine = new(session, openAIClient);
+        Engine engine = new(session, openAIClient, agentEventHub);
 
         CancellationTokenSource cancellationTokenSource = new();
         Console.CancelKeyPress += (sender, eventArgs) =>
@@ -26,11 +28,19 @@ public class Program
             cancellationTokenSource.Cancel();
         };
 
+        await terminalUI.Startup(cancellationTokenSource.Token);
         await toolManager.LoadToolsAsync(@"C:\Users\Kaze\source\repos\Wayfare\Tools", "*.cs", @"C:\Users\Kaze\source\repos\Wayfare\compiled", cancellationTokenSource.Token);
+        await terminalUI.FinaliseStartup(cancellationTokenSource.Token);
+
+        terminalUI.StartAgent();
 
         try
         {
-            await engine.RunAsync(cancellationTokenSource.Token);
+            while (!cancellationTokenSource.Token.IsCancellationRequested)
+            {
+                string userInput = await terminalUI.GetUserInputAsync(cancellationTokenSource.Token);
+                await engine.RunCycleAsync(userInput, cancellationTokenSource.Token);
+            }
         }
         catch (OperationCanceledException)
         {
