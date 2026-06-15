@@ -4,7 +4,7 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
 {
     public string Name => "write";
     public string DisplayName => "Write";
-    public string Description => "Writes the specified content to a file. Overwrites the file if it already exists, or creates it and any parent directories if it does not. Use only for new files or complete rewrites; for modifications, use the \"replace\" tool instead. Expects a JSON object with properties: \"path\" (string, required - the path of the file to write), \"content\" (string, required - the full text content to write). Example: {\"path\": \"src/newfile.txt\", \"content\": \"Hello World\"}";
+    public string Description => "Write content to a file, creating it if it does not exist or overwriting it if it does. Use this only for new files or full rewrites. To make targeted edits to an existing file, use replace instead. Parameters: path (string, required), content (string, required - the full content to write).";
 
     public string GetInvocationMessage(string arguments)
     {
