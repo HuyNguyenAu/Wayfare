@@ -64,7 +64,7 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
                 }
                 catch
                 {
-                    // Ignore
+                    // Ignore.
                 }
                 throw;
             }
