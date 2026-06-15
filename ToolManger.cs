@@ -66,6 +66,31 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
 
         events.Publish(new LoadingToolsStarted());
 
+        HashSet<string?> activeToolNames = toolFilePaths
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(name => name is not null && !_ignoreFiles.Contains($"{name}.cs"))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Delete stale DLL files for tools that no longer exist.
+        if (Directory.Exists(compiledDirectoryPath))
+        {
+            foreach (string dllFilePath in Directory.GetFiles(compiledDirectoryPath, "*.dll"))
+            {
+                string toolName = Path.GetFileNameWithoutExtension(dllFilePath);
+                if (!activeToolNames.Contains(toolName))
+                {
+                    try
+                    {
+                        File.Delete(dllFilePath);
+                    }
+                    catch
+                    {
+                        // Ignore deletion errors (e.g. file locked).
+                    }
+                }
+            }
+        }
+
         List<Exception> errors = [];
 
         foreach (string toolFilePath in toolFilePaths)
@@ -89,6 +114,17 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
                 catch (Exception ex)
                 {
                     errors.Add(ex);
+                    try
+                    {
+                        if (File.Exists(dllPath))
+                        {
+                            File.Delete(dllPath);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore
+                    }
                 }
             }
         }
