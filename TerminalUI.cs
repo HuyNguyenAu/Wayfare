@@ -28,7 +28,7 @@ internal class TerminalUI : ITerminalUI
 
         events.Subscribe<ThoughtChunkReceived>(e => OnThoughtChunkReceived(e.Message));
         events.Subscribe<ToolExecutionStarted>(e => OnToolExecutionStarted(e.InvocationMessage));
-        events.Subscribe<ToolExecutionCompleted>(e => OnToolExecutionCompleted(e.ToolName, e.Result));
+        events.Subscribe<ToolExecutionCompleted>(OnToolExecutionCompleted);
     }
 
     private static void OnLoadingToolsStarted()
@@ -71,10 +71,19 @@ internal class TerminalUI : ITerminalUI
         AnsiConsole.Markup($"[cyan][[SYSTEM]][/] Running {Markup.Escape(invocationMessage)}");
     }
 
-    private void OnToolExecutionCompleted(string toolName, string result)
+    private void OnToolExecutionCompleted(ToolExecutionCompleted e)
     {
-        AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
-        AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] [white]{Markup.Escape(result)}[/]");
+        if (e.Success)
+        {
+            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+            AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
+            AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
+        }
+
         _isFirstThoughtChunk = true;
     }
 
@@ -129,7 +138,7 @@ internal class TerminalUI : ITerminalUI
     public Task<string> GetUserInputAsync(CancellationToken cancellationToken)
     {
         _isFirstThoughtChunk = true;
-        
+
         if (_hasPrompted)
         {
             AnsiConsole.WriteLine();

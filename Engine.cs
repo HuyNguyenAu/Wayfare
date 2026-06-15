@@ -52,8 +52,9 @@ internal class Engine(ISession session, IChatClient chatClient, IEventPublisher 
         {
             ITool tool = session.GetTool(toolCall.Name);
             events.Publish(new ToolExecutionStarted(tool.GetInvocationMessage(toolCall.Arguments)));
+            
             ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
-            events.Publish(new ToolExecutionCompleted(toolCall.Name, result.DisplayMessage));
+            events.Publish(new ToolExecutionCompleted(result.Success, toolCall.Name, result.DisplayMessage, result.Result, result.Error));
 
             if (result.Success)
             {

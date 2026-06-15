@@ -15,7 +15,7 @@ internal record ToolLoadingCompleted();
 // Agent execution events
 internal record ThoughtChunkReceived(string Message);
 internal record ToolExecutionStarted(string InvocationMessage);
-internal record ToolExecutionCompleted(string ToolName, string Result);
+internal record ToolExecutionCompleted(bool Success, string ToolName, string DisplayMessage, string Result, string Error);
 
 internal interface IEventPublisher
 {
