@@ -6,7 +6,7 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 {
     public string Name => "execute";
     public string DisplayName => "Execute Command";
-    public string Description => "Executes a system command. Expects a JSON object with properties: \"command\" (string, required - the command or executable name, e.g. \"git\"), \"arguments\" (string, optional - the command line arguments, e.g. \"status\"). Example: {\"command\": \"git\", \"arguments\": \"status\"}";
+    public string Description => "Execute a CLI command. Parameters: command (string, required - the executable or command to run), arguments (string, optional - the arguments for the command)";
 
     public string GetInvocationMessage(string arguments)
     {
