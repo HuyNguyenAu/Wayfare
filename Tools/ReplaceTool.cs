@@ -4,7 +4,7 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
 {
     public string Name => "replace";
     public string DisplayName => "Replace";
-    public string Description => "Replace a block of text in a file. 'oldText' must match the file exactly (including whitespace and line endings) and must appear exactly once. If it appears more than once, include more surrounding lines to make it unique. Parameters: path (string, required), oldText (string, required - the exact text to find), newText (string, required - the text to replace it with).";
+    public string Description => "Replaces a specific block of text in a file. The \"oldText\" must match the file's content exactly, including whitespace and line endings, and must appear exactly once in the file (if not unique, include more surrounding lines as context). Expects a JSON object with properties: \"path\" (string, required - the path of the file to modify), \"oldText\" (string, required - the exact block of text to replace), \"newText\" (string, required - the new text to replace it with). Example: {\"path\": \"Program.cs\", \"oldText\": \"void Main()\", \"newText\": \"int Main()\"}";
 
     public string GetInvocationMessage(string arguments)
     {
