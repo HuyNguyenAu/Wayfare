@@ -20,19 +20,26 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
     {
         if (!toolHelpers.TryDeserializeArguments(arguments, out WriteFileArguments? writeFileArguments, out string? writeFileArgumentsError))
         {
-            return new ToolExecutionResult(false, "Invalid arguments", string.Empty, writeFileArgumentsError);
+            return new ToolExecutionResult(false, "Failed to write file due to invalid tool arguments.", string.Empty, $"Failed to write file: invalid tool arguments. Error: {writeFileArgumentsError}");
         }
 
         if (!toolHelpers.TryGetRequiredPath(writeFileArguments.Path, out string? resolvedPath, out string? requiredPathError))
         {
-            return new ToolExecutionResult(false, "Invalid path", string.Empty, requiredPathError);
+            return new ToolExecutionResult(false, $"Failed to write file: access denied or invalid path '{writeFileArguments.Path}'.", string.Empty, $"Failed to write file: access denied or invalid path '{writeFileArguments.Path}'.");
         }
 
-        toolHelpers.EnsureDirectoryExists(resolvedPath);
+        try
+        {
+            toolHelpers.EnsureDirectoryExists(resolvedPath);
 
-        await File.WriteAllTextAsync(resolvedPath, writeFileArguments.Content ?? string.Empty, cancellationToken);
+            await File.WriteAllTextAsync(resolvedPath, writeFileArguments.Content ?? string.Empty, cancellationToken);
 
-        return new ToolExecutionResult(true, "File written successfully", $"Successfully wrote file '{writeFileArguments.Path}'", string.Empty);
+            return new ToolExecutionResult(true, $"Successfully wrote content to file '{writeFileArguments.Path}'.", $"Successfully wrote all content to file '{writeFileArguments.Path}'.", string.Empty);
+        }
+        catch (Exception ex)
+        {
+            return new ToolExecutionResult(false, $"An unexpected error occurred while writing to file '{writeFileArguments.Path}'.", string.Empty, $"Failed to write file: an unexpected error occurred. Error: {ex.Message}", ex);
+        }
     }
 
     internal record WriteFileArguments(string Path, string Content);

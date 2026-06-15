@@ -20,22 +20,22 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
     {
         if (!toolHelpers.TryDeserializeArguments(arguments, out ReplaceArguments? replaceArguments, out string? replaceArgumentsError))
         {
-            return new ToolExecutionResult(false, "Invalid arguments", string.Empty, replaceArgumentsError);
+            return new ToolExecutionResult(false, "Failed to replace text due to invalid tool arguments.", string.Empty, $"Failed to replace text: invalid tool arguments. Error: {replaceArgumentsError}");
         }
 
         if (!toolHelpers.TryGetRequiredPath(replaceArguments.Path, out string? resolvedPath, out string? requiredPathError))
         {
-            return new ToolExecutionResult(false, "Invalid path", string.Empty, requiredPathError);
+            return new ToolExecutionResult(false, $"Failed to replace text: access denied or invalid path '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: access denied or invalid path '{replaceArguments.Path}'.");
         }
 
         if (!File.Exists(resolvedPath))
         {
-            return new ToolExecutionResult(false, "File does not exist", string.Empty, $"Failed to replace text because file does not exist at path '{replaceArguments.Path}'");
+            return new ToolExecutionResult(false, $"Failed to replace text: file does not exist '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: file does not exist at '{replaceArguments.Path}'.");
         }
 
         if (string.IsNullOrEmpty(replaceArguments.OldText))
         {
-            return new ToolExecutionResult(false, "Invalid arguments", string.Empty, "Failed to replace text: 'oldText' is required and cannot be empty");
+            return new ToolExecutionResult(false, "Failed to replace text because 'oldText' parameter is missing.", string.Empty, "Failed to replace text: 'oldText' parameter is required.");
         }
 
         try
@@ -46,25 +46,25 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
 
             if (index == -1)
             {
-                return new ToolExecutionResult(false, "Text not found", string.Empty, $"Failed to replace text: 'oldText' not found in '{replaceArguments.Path}'. It must match the file exactly, including whitespace and line endings. Read the file first to confirm the exact text");
+                return new ToolExecutionResult(false, $"Failed to replace text: target text not found in '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: 'oldText' was not found in '{replaceArguments.Path}'. The search block must match the file content exactly, including all whitespace, indentation, and newlines. Please read the file first to verify the exact content.");
             }
 
             int lastIndex = content.LastIndexOf(replaceArguments.OldText, StringComparison.Ordinal);
 
             if (index != lastIndex)
             {
-                return new ToolExecutionResult(false, "Text not unique", string.Empty, $"Failed to replace text: 'oldText' appears more than once in '{replaceArguments.Path}'. Add more surrounding lines to make it unique");
+                return new ToolExecutionResult(false, $"Failed to replace text: target text is not unique in '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: 'oldText' matches multiple locations in '{replaceArguments.Path}'. Please include more surrounding lines/context to make the block unique.");
             }
 
             string newContent = content.Remove(index, replaceArguments.OldText.Length).Insert(index, replaceArguments.NewText ?? string.Empty);
 
             await File.WriteAllTextAsync(resolvedPath, newContent, cancellationToken);
 
-            return new ToolExecutionResult(true, "Text replaced successfully", $"Successfully replaced text in '{replaceArguments.Path}'", string.Empty);
+            return new ToolExecutionResult(true, $"Successfully replaced text in '{replaceArguments.Path}'.", $"Successfully replaced text block in file '{replaceArguments.Path}'.", string.Empty);
         }
         catch (Exception ex)
         {
-            return new ToolExecutionResult(false, "Exception occurred", string.Empty, $"Failed to replace text because {ex}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while replacing text in '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: an unexpected error occurred. Error: {ex.Message}", ex);
         }
     }
 

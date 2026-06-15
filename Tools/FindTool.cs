@@ -21,24 +21,24 @@ internal sealed class FindTool(IToolHelpers toolHelpers) : ITool
     {
         if (!toolHelpers.TryDeserializeArguments(arguments, out FindArguments? findArguments, out string? findArgumentsError))
         {
-            return new ToolExecutionResult(false, "Invalid arguments", string.Empty, findArgumentsError);
+            return new ToolExecutionResult(false, "Failed to search due to invalid tool arguments.", string.Empty, $"Failed to search: invalid tool arguments. Error: {findArgumentsError}");
         }
 
         if (string.IsNullOrWhiteSpace(findArguments.Pattern))
         {
-            return new ToolExecutionResult(false, "Missing pattern", string.Empty, "Failed to execute find because 'pattern' parameter is required");
+            return new ToolExecutionResult(false, "Failed to search because 'pattern' parameter is missing.", string.Empty, "Failed to search: 'pattern' parameter is required.");
         }
 
         string searchPath = string.IsNullOrWhiteSpace(findArguments.Path) ? "." : findArguments.Path;
 
         if (!toolHelpers.TryGetRequiredPath(searchPath, out string? resolvedPath, out string? requiredPathError))
         {
-            return new ToolExecutionResult(false, "Invalid path", string.Empty, $"Failed to execute find because {requiredPathError}");
+            return new ToolExecutionResult(false, $"Failed to search: access denied or invalid path '{searchPath}'.", string.Empty, $"Failed to search: access denied or invalid path '{searchPath}'.");
         }
 
         if (!Directory.Exists(resolvedPath))
         {
-            return new ToolExecutionResult(false, "Directory does not exist", string.Empty, $"Failed to execute find because directory does not exist: {resolvedPath}");
+            return new ToolExecutionResult(false, $"Failed to search: directory does not exist '{resolvedPath}'.", string.Empty, $"Failed to search: directory does not exist at '{resolvedPath}'.");
         }
 
         try
@@ -57,15 +57,15 @@ internal sealed class FindTool(IToolHelpers toolHelpers) : ITool
 
             if (matches.Count <= 0)
             {
-                return new ToolExecutionResult(true, "No matches found", string.Empty, "No matches found");
+                return new ToolExecutionResult(true, $"No matches found for '{findArguments.Pattern}' in '{searchPath}'.", $"No files or directories matching pattern '{findArguments.Pattern}' were found in '{searchPath}'.", string.Empty);
             }
 
-            string result = string.Join(Environment.NewLine, matches);
-            return new ToolExecutionResult(true, $"{matches.Count} matches found", result, string.Empty);
+            string result = $"Found {matches.Count} match(es) for pattern '{findArguments.Pattern}' in '{searchPath}':{Environment.NewLine}{string.Join(Environment.NewLine, matches)}";
+            return new ToolExecutionResult(true, $"Found {matches.Count} match(es) for '{findArguments.Pattern}' in '{searchPath}'.", result, string.Empty);
         }
         catch (Exception ex)
         {
-            return new ToolExecutionResult(false, "Exception occurred", string.Empty, $"Failed to execute find because {ex}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while searching in '{resolvedPath}'.", string.Empty, $"Failed to search: an unexpected error occurred. Error: {ex.Message}", ex);
         }
     }
 

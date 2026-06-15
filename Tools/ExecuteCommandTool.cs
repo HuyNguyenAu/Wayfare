@@ -22,12 +22,12 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
     {
         if (!toolHelpers.TryDeserializeArguments(arguments, out ExecuteCommandArguments? executeCommandArguments, out string? executeCommandArgumentsError))
         {
-            return new ToolExecutionResult(false, "Invalid arguments", string.Empty, executeCommandArgumentsError);
+            return new ToolExecutionResult(false, "Failed to execute command due to invalid tool arguments.", string.Empty, $"Failed to execute command: invalid tool arguments. Error: {executeCommandArgumentsError}");
         }
 
         if (string.IsNullOrWhiteSpace(executeCommandArguments.Command))
         {
-            return new ToolExecutionResult(false, "Missing command", string.Empty, "Failed to execute command because 'command' parameter is required");
+            return new ToolExecutionResult(false, "Failed to execute command because 'command' parameter is missing.", string.Empty, "Failed to execute command: 'command' parameter is required.");
         }
 
         try
@@ -46,7 +46,7 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 
             if (process == null)
             {
-                return new ToolExecutionResult(false, "Process could not be started", string.Empty, $"Failed to execute '{executeCommandArguments.Command}' command because the process could not be started.");
+                return new ToolExecutionResult(false, $"Failed to start command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: process could not be started for '{executeCommandArguments.Command}'.");
             }
 
             Task<string> outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
@@ -58,15 +58,15 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
             string error = await errorTask;
 
             bool success = process.ExitCode == 0;
-            string displayMessage = success ? output : "Failed to execute command";
-            string result = success ? output : string.Empty;
-            string errorMessage = success ? string.Empty : error;
+            string displayMessage = success ? $"Command '{executeCommandArguments.Command}' executed successfully." : $"Command '{executeCommandArguments.Command}' exited with error code {process.ExitCode}.";
+            string result = success ? $"Command '{executeCommandArguments.Command}' executed successfully with exit code 0.{Environment.NewLine}Output:{Environment.NewLine}{output}" : string.Empty;
+            string errorMessage = success ? string.Empty : $"Command failed with exit code {process.ExitCode}. {(string.IsNullOrWhiteSpace(error) ? "No error output returned." : $"Stderr: {error}")}";
 
             return new ToolExecutionResult(success, displayMessage, result, errorMessage);
         }
         catch (Exception ex)
         {
-            return new ToolExecutionResult(false, "Exception occurred", string.Empty, $"Failed to execute command '{executeCommandArguments.Command}' because {ex}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while executing command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: an unexpected error occurred. Error: {ex.Message}", ex);
         }
     }
 

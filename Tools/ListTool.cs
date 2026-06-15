@@ -20,17 +20,17 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
     {
         if (!toolHelpers.TryDeserializeArguments(arguments, out ListFilesArguments? listArguments, out string? listArgumentsError))
         {
-            return new ToolExecutionResult(false, "Invalid arguments", string.Empty, listArgumentsError);
+            return new ToolExecutionResult(false, "Failed to list directory due to invalid tool arguments.", string.Empty, $"Failed to list directory: invalid tool arguments. Error: {listArgumentsError}");
         }
 
         if (!toolHelpers.TryGetRequiredPath(listArguments.Path, out string? resolvedPath, out string? requiredPathError))
         {
-            return new ToolExecutionResult(false, "Invalid path", string.Empty, requiredPathError);
+            return new ToolExecutionResult(false, $"Failed to list: access denied or invalid path '{listArguments.Path}'.", string.Empty, $"Failed to list: access denied or invalid path '{listArguments.Path}'.");
         }
 
         if (!Directory.Exists(resolvedPath))
         {
-            return new ToolExecutionResult(false, "Directory does not exist", string.Empty, $"Failed to execute list because directory does not exist '{listArguments.Path}'");
+            return new ToolExecutionResult(false, $"Failed to list: directory does not exist '{listArguments.Path}'.", string.Empty, $"Failed to list: directory does not exist at '{listArguments.Path}'.");
         }
 
         try
@@ -52,11 +52,15 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
                 matches.Add(name);
             }
 
-            return new ToolExecutionResult(true, $"{matches.Count} entries found", string.Join(Environment.NewLine, matches), string.Empty);
+            string result = matches.Count <= 0 
+                ? $"Directory '{listArguments.Path}' is empty." 
+                : $"Directory entries in '{listArguments.Path}':{Environment.NewLine}{string.Join(Environment.NewLine, matches)}";
+
+            return new ToolExecutionResult(true, $"Listed {matches.Count} entries in '{listArguments.Path}'.", result, string.Empty);
         }
         catch (Exception ex)
         {
-            return new ToolExecutionResult(false, "Exception occurred", string.Empty, $"Failed to execute list because {ex}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while listing directory '{listArguments.Path}'.", string.Empty, $"Failed to list directory: an unexpected error occurred. Error: {ex.Message}", ex);
         }
     }
 
