@@ -23,6 +23,16 @@ internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
             return new ToolExecutionResult(false, "Failed to read file due to invalid tool arguments.", string.Empty, $"Failed to read file: invalid tool arguments. Error: {readFileArgumentsError}");
         }
 
+        if (readFileArguments.Offset < 0)
+        {
+            return new ToolExecutionResult(false, "Failed to read file because 'offset' cannot be negative.", string.Empty, "Failed to read file: 'offset' parameter must be non-negative.");
+        }
+
+        if (readFileArguments.Limit < 0)
+        {
+            return new ToolExecutionResult(false, "Failed to read file because 'limit' cannot be negative.", string.Empty, "Failed to read file: 'limit' parameter must be non-negative.");
+        }
+
         if (!toolHelpers.TryGetRequiredPath(readFileArguments.Path, out string? resolvedPath, out string? requiredPathError))
         {
             return new ToolExecutionResult(false, $"Failed to read file: access denied or invalid path '{readFileArguments.Path}'.", string.Empty, $"Failed to read file: access denied or invalid path '{readFileArguments.Path}'.");
