@@ -113,7 +113,9 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
                 }
                 catch (Exception ex)
                 {
+                    events.Publish(new ToolCompilationFailed(toolName, ex.Message));
                     errors.Add(ex);
+                   
                     try
                     {
                         if (File.Exists(dllPath))
@@ -123,7 +125,7 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
                     }
                     catch
                     {
-                        // Ignore
+                        // Ignore.
                     }
                 }
             }
@@ -133,9 +135,10 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
 
         foreach (string dllFilePath in Directory.GetFiles(compiledDirectoryPath, "*.dll"))
         {
+            string toolName = Path.GetFileNameWithoutExtension(dllFilePath);
+        
             try
             {
-                string toolName = Path.GetFileNameWithoutExtension(dllFilePath);
                 events.Publish(new ToolLoadingStarted(toolName));
 
                 ITool tool = LoadTool(dllFilePath);
@@ -145,6 +148,7 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
             }
             catch (Exception ex)
             {
+                events.Publish(new ToolLoadingFailed(toolName, ex.Message));
                 errors.Add(ex);
             }
         }

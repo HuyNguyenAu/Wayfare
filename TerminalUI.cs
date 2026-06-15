@@ -19,19 +19,19 @@ internal class TerminalUI : ITerminalUI, IDisposable
 {
     private bool _hasPrompted = false;
     private bool _isFirstThoughtChunk = true;
+  
     private readonly Lock _consoleLock = new();
-    private readonly Pipe _thoughtChunkPipe = new();
-    private readonly Stream _thoughtChunkStream;
+  
+    private Pipe? _thoughtChunkPipe;
+    private Stream? _thoughtChunkStream;
+    private Task? _thoughtChunkTask;
 
     public TerminalUI(AgentEventHub eventHub, CancellationToken cancellationToken)
     {
         Console.OutputEncoding = Encoding.UTF8;
         AnsiConsole.Clear();
 
-        _thoughtChunkStream = _thoughtChunkPipe.Writer.AsStream();
-
         _ = ProcessEventsAsync(eventHub.Reader, cancellationToken);
-        _ = ProcessThoughtChunksAsync(cancellationToken);
     }
 
     private async Task ProcessEventsAsync(ChannelReader<IAgentEvent> reader, CancellationToken cancellationToken)
@@ -42,7 +42,7 @@ internal class TerminalUI : ITerminalUI, IDisposable
             {
                 while (reader.TryRead(out var @event))
                 {
-                    await HandleEventAsync(@event);
+                    await HandleEventAsync(@event, cancellationToken);
                 }
             }
         }
@@ -52,19 +52,7 @@ internal class TerminalUI : ITerminalUI, IDisposable
         }
     }
 
-    private async Task ProcessThoughtChunksAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await AnsiConsole.Console.WriteMarkdownAsync(_thoughtChunkPipe.Reader.AsStream(), MarkdownStyles.Default, Encoding.UTF8, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // Ignore cancellation exceptions during shutdown.
-        }
-    }
-
-    private async Task HandleEventAsync(IAgentEvent @event)
+    private async Task HandleEventAsync(IAgentEvent @event, CancellationToken cancellationToken)
     {
         switch (@event)
         {
@@ -77,14 +65,20 @@ internal class TerminalUI : ITerminalUI, IDisposable
             case ToolCompilationCompleted:
                 OnToolCompilationCompleted();
                 break;
+            case ToolCompilationFailed e:
+                OnToolCompilationFailed(e.ToolName, e.Error);
+                break;
             case ToolLoadingStarted e:
                 OnToolLoadingStarted(e.ToolName);
                 break;
             case ToolLoadingCompleted:
                 OnToolLoadingCompleted();
                 break;
+            case ToolLoadingFailed e:
+                OnToolLoadingFailed(e.ToolName, e.Error);
+                break;
             case ChatRequestStarted e:
-                OnChatRequestStarted(e);
+                OnChatRequestStarted(e, cancellationToken);
                 break;
             case ChatRequestCompleted:
                 OnChatRequestCompleted();
@@ -141,12 +135,60 @@ internal class TerminalUI : ITerminalUI, IDisposable
         }
     }
 
-    private void OnChatRequestStarted(ChatRequestStarted e)
+    private void OnToolCompilationFailed(string toolName, string error)
     {
         lock (_consoleLock)
         {
+            AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
+            AnsiConsole.MarkupLine($"[red]Error compiling {toolName}: {error}[/]");
+        }
+    }
+
+    private void OnToolLoadingFailed(string toolName, string error)
+    {
+        lock (_consoleLock)
+        {
+            AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
+            AnsiConsole.MarkupLine($"[red]Error loading {toolName}: {error}[/]");
+        }
+    }
+
+    private void CloseThoughtChunkStream()
+    {
+        _thoughtChunkPipe?.Writer.Complete();
+        _thoughtChunkPipe = null;
+
+        _thoughtChunkStream?.Dispose();
+        _thoughtChunkStream = null;
+
+        _thoughtChunkTask?.Dispose();
+        _thoughtChunkTask = null;
+    }
+
+    private void OnChatRequestStarted(ChatRequestStarted e, CancellationToken cancellationToken)
+    {
+        lock (_consoleLock)
+        {
+            CloseThoughtChunkStream();
+
             AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape(e.Description)}");
             _isFirstThoughtChunk = true;
+
+            _thoughtChunkPipe = new Pipe();
+            _thoughtChunkStream = _thoughtChunkPipe.Writer.AsStream();
+            _thoughtChunkTask = ProcessThoughtChunksAsync(_thoughtChunkPipe.Reader.AsStream(), cancellationToken);
+        }
+    }
+
+    private static async Task ProcessThoughtChunksAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await AnsiConsole.Console.WriteMarkdownAsync(stream, MarkdownStyles.Default, Encoding.UTF8, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignore cancellation exceptions during shutdown.
         }
     }
 
@@ -159,6 +201,8 @@ internal class TerminalUI : ITerminalUI, IDisposable
                 AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
                 _isFirstThoughtChunk = false;
             }
+
+            CloseThoughtChunkStream();
         }
     }
 
@@ -172,9 +216,12 @@ internal class TerminalUI : ITerminalUI, IDisposable
                 _isFirstThoughtChunk = false;
             }
 
-            byte[] bytes = Encoding.UTF8.GetBytes(message);
-            _thoughtChunkStream.Write(bytes, 0, bytes.Length);
-            _thoughtChunkStream.Flush();
+            if (_thoughtChunkStream is not null)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(message);
+                _thoughtChunkStream.Write(bytes, 0, bytes.Length);
+                _thoughtChunkStream.Flush();
+            }
         }
     }
 
@@ -276,7 +323,9 @@ internal class TerminalUI : ITerminalUI, IDisposable
 
     public void Dispose()
     {
-        _thoughtChunkPipe.Writer.Complete();
-        _thoughtChunkStream.Dispose();
+        lock (_consoleLock)
+        {
+            CloseThoughtChunkStream();
+        }
     }
 }

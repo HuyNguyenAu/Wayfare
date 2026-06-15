@@ -33,7 +33,7 @@ internal interface ISession
     void RecordObservation(ToolResult[] toolResults);
     void ResumeThinking();
     void Finish();
-    void Reset();
+    void Idle();
 
     ITool GetTool(string name);
     ITool[] GetTools();
@@ -95,7 +95,7 @@ internal class Session : ISession
         State = State.Done;
     }
 
-    public void Reset()
+    public void Idle()
     {
         EnsureState(State.Done);
         State = State.Idle;

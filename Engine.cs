@@ -53,7 +53,7 @@ internal class Engine(ISession session, IChatClient chatClient, IEventPublisher 
             }
         }
 
-        session.Reset();
+        session.Idle();
     }
 
     private async Task<ToolResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken)

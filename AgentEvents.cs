@@ -8,8 +8,10 @@ internal interface IAgentEvent;
 internal record LoadingToolsStarted() : IAgentEvent;
 internal record ToolCompilationStarted(string ToolName) : IAgentEvent;
 internal record ToolCompilationCompleted() : IAgentEvent;
+internal record ToolCompilationFailed(string ToolName, string Error) : IAgentEvent;
 internal record ToolLoadingStarted(string ToolName) : IAgentEvent;
 internal record ToolLoadingCompleted() : IAgentEvent;
+internal record ToolLoadingFailed(string ToolName, string Error) : IAgentEvent;
 
 // Agent execution events
 internal record ChatRequestStarted(string Description) : IAgentEvent;
