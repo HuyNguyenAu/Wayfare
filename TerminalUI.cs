@@ -12,7 +12,6 @@ internal interface ITerminalUI
 
 internal class TerminalUI : ITerminalUI
 {
-    private bool _hasPrompted;
     private bool _isFirstThoughtChunk = true;
     private readonly Lock _consoleLock = new();
 
@@ -164,17 +163,10 @@ internal class TerminalUI : ITerminalUI
     {
         _isFirstThoughtChunk = true;
 
-        if (_hasPrompted)
-        {
-            AnsiConsole.WriteLine();
-        }
-        else
-        {
-            _hasPrompted = true;
-        }
+        AnsiConsole.WriteLine();
 
         return AnsiConsole.PromptAsync(
-            new TextPrompt<string>("[bold red]You[/][bold white]://>[/]")
+            new TextPrompt<string>($"[bold red]{Environment.UserName}[/][bold white]://>[/]")
                 .PromptStyle("white")
                 .AllowEmpty(),
             cancellationToken
