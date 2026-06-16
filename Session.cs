@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using WayFare.Tools;
 
 namespace WayFare;
@@ -15,12 +17,18 @@ internal enum State
 internal record ToolCall(string ToolId, string Name, string Arguments);
 internal record ToolResult(string ToolId, string ToolName, string Result);
 
+[JsonDerivedType(typeof(SystemMessage), typeDiscriminator: "system")]
+[JsonDerivedType(typeof(UserMessage), typeDiscriminator: "user")]
+[JsonDerivedType(typeof(AssistantMessage), typeDiscriminator: "assistant")]
+[JsonDerivedType(typeof(ToolCallMessage), typeDiscriminator: "tool_call")]
+[JsonDerivedType(typeof(ToolResultMessage), typeDiscriminator: "tool_result")]
 internal interface ISessionMessage;
 internal record SystemMessage(string Content) : ISessionMessage;
 internal record UserMessage(string Content) : ISessionMessage;
 internal record AssistantMessage(string Content) : ISessionMessage;
 internal record ToolCallMessage(ToolCall[] ToolCalls) : ISessionMessage;
 internal record ToolResultMessage(ToolResult[] ToolResults) : ISessionMessage;
+
 
 internal interface ISession
 {
@@ -45,11 +53,43 @@ internal class Session : ISession
     public List<ISessionMessage> Messages { get; private set; }
 
     private readonly IToolManager _toolManager;
+    private readonly string _sessionsDirectory;
+    private readonly string _filePath;
 
-    public Session(IToolManager toolManager)
+    public Session(IToolManager toolManager, string sessionsDirectory)
     {
         _toolManager = toolManager;
+        _sessionsDirectory = sessionsDirectory;
+        _filePath = Path.Combine(_sessionsDirectory, $"session_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jsonl");
+
+        if (string.IsNullOrEmpty(sessionsDirectory))
+        {
+            throw new InvalidOperationException("Sessions directory must be specified.");
+        }
+
+        Directory.CreateDirectory(_sessionsDirectory);
+
         Messages = [new SystemMessage(SystemPrompt())];
+    }
+
+    private void UpdateSessionFile()
+    {
+        try
+        {
+            StringBuilder stringBuilder = new();
+
+            foreach (ISessionMessage message in Messages)
+            {
+                string json = JsonSerializer.Serialize(message);
+                stringBuilder.AppendLine(json);
+            }
+            
+            File.WriteAllText(_filePath, stringBuilder.ToString());
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to rewrite session messages: {ex.Message}");
+        }
     }
 
     public void BeginThinking(string userInput)
@@ -57,14 +97,18 @@ internal class Session : ISession
         EnsureState(State.Idle, State.Observing);
         State = State.Thinking;
 
-        Messages.Add(new UserMessage(userInput));
+        UserMessage userMessage = new(userInput);
+        Messages.Add(userMessage);
+        UpdateSessionFile();
     }
 
     public void RecordThought(string content)
     {
         EnsureState(State.Thinking);
 
-        Messages.Add(new AssistantMessage(content));
+        AssistantMessage assistantMessage = new(content);
+        Messages.Add(assistantMessage);
+        UpdateSessionFile();
     }
 
     public void RequestAction(ToolCall[] toolCalls)
@@ -72,7 +116,9 @@ internal class Session : ISession
         EnsureState(State.Thinking);
         State = State.Acting;
 
-        Messages.Add(new ToolCallMessage(toolCalls));
+        ToolCallMessage toolCallMessage = new(toolCalls);
+        Messages.Add(toolCallMessage);
+        UpdateSessionFile();
     }
 
     public void RecordObservation(ToolResult[] toolResults)
@@ -80,7 +126,9 @@ internal class Session : ISession
         EnsureState(State.Acting);
         State = State.Observing;
 
-        Messages.Add(new ToolResultMessage(toolResults));
+        ToolResultMessage toolResultMessage = new(toolResults);
+        Messages.Add(toolResultMessage);
+        UpdateSessionFile();
     }
 
     public void ResumeThinking()
@@ -99,7 +147,10 @@ internal class Session : ISession
     {
         EnsureState(State.Done);
         State = State.Idle;
-        Messages[0] = new SystemMessage(SystemPrompt());
+
+        SystemMessage newSystemMessage = new(SystemPrompt());
+        Messages[0] = newSystemMessage;
+        UpdateSessionFile();
     }
 
     public ITool GetTool(string name)

@@ -11,7 +11,8 @@ public class Program
     private static readonly string _apiKeyKey = "WAYFARE_API_KEY";
     private static readonly string _endpointKey = "WAYFARE_ENDPOINT";
     private static readonly string _toolsPathKey = "WAYFARE_TOOLS_PATH";
-    private static readonly string _compiledPathKey = "WAYFARE_COMPILED_PATH";
+    private static readonly string _compiledDirectoryKey = "WAYFARE_COMPILED_DIRECTORY";
+    private static readonly string _sessionsDirectoryKey = "WAYFARE_SESSIONS_DIRECTORY";
 
     public static async Task Main()
     {
@@ -25,8 +26,25 @@ public class Program
             ?? throw new InvalidOperationException($"Endpoint must be specified in {_endpointKey} environment variable.");
         string toolsPath = Environment.GetEnvironmentVariable(_toolsPathKey)
             ?? throw new InvalidOperationException($"Tools path must be specified in {_toolsPathKey} environment variable.");
-        string compiledPath = Environment.GetEnvironmentVariable(_compiledPathKey)
-            ?? throw new InvalidOperationException($"Compiled path must be specified in {_compiledPathKey} environment variable.");
+        string compiledDirectory = Environment.GetEnvironmentVariable(_compiledDirectoryKey)
+            ?? throw new InvalidOperationException($"Compiled directory must be specified in {_compiledDirectoryKey} environment variable.");
+        string sessionsDirectory = Environment.GetEnvironmentVariable(_sessionsDirectoryKey)
+            ?? throw new InvalidOperationException($"Sessions directory must be specified in {_sessionsDirectoryKey} environment variable.");
+
+        if (string.IsNullOrEmpty(toolsPath))
+        {
+            throw new InvalidOperationException("Tools path must be specified.");
+        }
+
+        if (string.IsNullOrEmpty(compiledDirectory))
+        {
+            throw new InvalidOperationException("Compiled directory must be specified.");
+        }
+
+        if (string.IsNullOrEmpty(sessionsDirectory))
+        {
+            throw new InvalidOperationException("Sessions directory must be specified.");
+        }
 
         ChatClient chatClient = new(modelName, new ApiKeyCredential(apiKey), new OpenAIClientOptions()
         {
@@ -44,11 +62,11 @@ public class Program
         await using TerminalUI terminalUI = new(cancellationTokenSource.Token);
         AgentEventPublisher agentEventPublisher = new([terminalUI]);
         ToolManager toolManager = new(agentEventPublisher);
-        Session session = new(toolManager);
+        Session session = new(toolManager, sessionsDirectory);
         Engine engine = new(session, openAIClient, agentEventPublisher);
 
         await agentEventPublisher.PublishAsync(new StartupStarted(), cancellationTokenSource.Token);
-        await toolManager.LoadToolsAsync(toolsPath, "*.cs", compiledPath, cancellationTokenSource.Token);
+        await toolManager.LoadToolsAsync(toolsPath, "*.cs", compiledDirectory, cancellationTokenSource.Token);
         await agentEventPublisher.PublishAsync(new StartupCompleted(), cancellationTokenSource.Token);
         await agentEventPublisher.PublishAsync(new StartAgent(), cancellationTokenSource.Token);
 
@@ -62,7 +80,14 @@ public class Program
         }
         catch (OperationCanceledException)
         {
-            Console.WriteLine("Application is shutting down...");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"An error occurred: {ex.Message}");
+        }
+        finally
+        {
+            await cancellationTokenSource.CancelAsync();
         }
     }
 }
