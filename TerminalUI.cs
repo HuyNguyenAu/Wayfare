@@ -1,5 +1,6 @@
 using System.IO.Pipelines;
 using System.Text;
+using System.Threading.Channels;
 using NTokenizers.Extensions.Spectre.Console;
 using NTokenizers.Extensions.Spectre.Console.Styles;
 using Spectre.Console;
@@ -18,12 +19,15 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
     private bool _isFirstThoughtChunk = true;
     private readonly Pipe _thoughtChunkPipe = new();
     private readonly Task _thoughtChunkReaderTask;
+    private readonly Channel<string> _thoughtChunkChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Task _pipeWriterTask;
 
     public TerminalUI(CancellationToken cancellationToken)
     {
         Console.OutputEncoding = Encoding.UTF8;
         AnsiConsole.Clear();
 
+        _pipeWriterTask = Task.Run(() => WriteToPipeLoopAsync(cancellationToken), cancellationToken);
         _thoughtChunkReaderTask = Task.Run(() => AnsiConsole.Console.WriteMarkdownAsync(_thoughtChunkPipe.Reader.AsStream(), MarkdownStyles.Default, Encoding.UTF8, cancellationToken), cancellationToken);
     }
 
@@ -187,8 +191,22 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
             _isFirstThoughtChunk = false;
         }
 
-        await _thoughtChunkPipe.Writer.WriteAsync(Encoding.UTF8.GetBytes(message), cancellationToken);
-        await _thoughtChunkPipe.Writer.FlushAsync(cancellationToken);
+        await _thoughtChunkChannel.Writer.WriteAsync(message, cancellationToken);
+    }
+
+    private async Task WriteToPipeLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (string chunk in _thoughtChunkChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                await _thoughtChunkPipe.Writer.WriteAsync(Encoding.UTF8.GetBytes(chunk), cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when cancelled.
+        }
     }
 
     private static void OnToolExecutionStarted(string invocationMessage)
@@ -242,11 +260,23 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
 
         _disposed = true;
 
+        _thoughtChunkChannel.Writer.Complete();
+
+        try
+        {
+            await _pipeWriterTask;
+        }
+        catch (Exception)
+        {
+            // Ignore any exceptions during task cleanup.
+        }
+
         _thoughtChunkPipe.Writer.Complete();
         _thoughtChunkPipe.Reader.Complete();
 
         try
         {
+            await _pipeWriterTask;
             await _thoughtChunkReaderTask;
         }
         catch (Exception)
