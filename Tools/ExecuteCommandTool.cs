@@ -44,7 +44,7 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 
             using Process? process = Process.Start(startInfo);
 
-            if (process == null)
+            if (process is null)
             {
                 return new ToolExecutionResult(false, $"Failed to start command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: process could not be started for '{executeCommandArguments.Command}'.");
             }

@@ -1,3 +1,7 @@
+using System.IO.Pipelines;
+using System.Text;
+using NTokenizers.Extensions.Spectre.Console;
+using NTokenizers.Extensions.Spectre.Console.Styles;
 using Spectre.Console;
 
 namespace WayFare;
@@ -7,15 +11,20 @@ internal interface ITerminalUI
     Task<string> GetUserInputAsync(CancellationToken cancellationToken);
 }
 
-internal class TerminalUI : ITerminalUI, IAgentEventSubscriber
+internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
 {
+    private bool _disposed = false;
     private bool _hasPrompted = false;
     private bool _isFirstThoughtChunk = true;
+    private readonly Pipe _thoughtChunkPipe = new();
+    private readonly Task _thoughtChunkReaderTask;
 
-    public TerminalUI()
+    public TerminalUI(CancellationToken cancellationToken)
     {
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Console.OutputEncoding = Encoding.UTF8;
         AnsiConsole.Clear();
+
+        _thoughtChunkReaderTask = Task.Run(() => AnsiConsole.Console.WriteMarkdownAsync(_thoughtChunkPipe.Reader.AsStream(), MarkdownStyles.Default, Encoding.UTF8, cancellationToken), cancellationToken);
     }
 
     public async Task OnMessageAsync(IAgentEvent @event, CancellationToken cancellationToken)
@@ -59,7 +68,7 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber
                 OnChatRequestCompleted();
                 break;
             case ThoughtChunkReceived e:
-                OnThoughtChunkReceived(e.Message);
+                await OnThoughtChunkReceivedAsync(e.Message, cancellationToken);
                 break;
             case ToolExecutionStarted e:
                 OnToolExecutionStarted(e.InvocationMessage);
@@ -170,14 +179,16 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber
         }
     }
 
-    private void OnThoughtChunkReceived(string message)
+    private async Task OnThoughtChunkReceivedAsync(string message, CancellationToken cancellationToken)
     {
         if (_isFirstThoughtChunk)
         {
             AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
             _isFirstThoughtChunk = false;
         }
-        AnsiConsole.Markup(Markup.Escape(message));
+
+        await _thoughtChunkPipe.Writer.WriteAsync(Encoding.UTF8.GetBytes(message), cancellationToken);
+        await _thoughtChunkPipe.Writer.FlushAsync(cancellationToken);
     }
 
     private static void OnToolExecutionStarted(string invocationMessage)
@@ -220,5 +231,27 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber
                 .AllowEmpty(),
             cancellationToken
         );
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _thoughtChunkPipe.Writer.Complete();
+        _thoughtChunkPipe.Reader.Complete();
+
+        try
+        {
+            await _thoughtChunkReaderTask;
+        }
+        catch (Exception)
+        {
+            // Ignore any exceptions during task cleanup.
+        }
     }
 }

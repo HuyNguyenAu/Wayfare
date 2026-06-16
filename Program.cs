@@ -15,18 +15,18 @@ public class Program
         });
         OpenAIClient openAIClient = new(chatClient);
 
-        TerminalUI terminalUI = new();
-        AgentEventPublisher agentEventPublisher = new([terminalUI]);
-        ToolManager toolManager = new(agentEventPublisher);
-        Session session = new(toolManager);
-        Engine engine = new(session, openAIClient, agentEventPublisher);
-
         CancellationTokenSource cancellationTokenSource = new();
         Console.CancelKeyPress += (sender, eventArgs) =>
         {
             eventArgs.Cancel = true;
             cancellationTokenSource.Cancel();
         };
+
+        await using TerminalUI terminalUI = new(cancellationTokenSource.Token);
+        AgentEventPublisher agentEventPublisher = new([terminalUI]);
+        ToolManager toolManager = new(agentEventPublisher);
+        Session session = new(toolManager);
+        Engine engine = new(session, openAIClient, agentEventPublisher);
 
         await agentEventPublisher.PublishAsync(new StartupStarted(), cancellationTokenSource.Token);
         await toolManager.LoadToolsAsync(@"C:\Users\Kaze\source\repos\Wayfare\Tools", "*.cs", @"C:\Users\Kaze\source\repos\Wayfare\compiled", cancellationTokenSource.Token);

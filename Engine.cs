@@ -41,7 +41,6 @@ internal class Engine(ISession session, IChatClient chatClient, IAgentEventPubli
                 Task<ToolResult>[] executionTasks = [.. toolCalls.Select(toolCall => ExecuteToolAsync(toolCall, cancellationToken))];
                 ToolResult[] toolResults = await Task.WhenAll(executionTasks);
                 session.RecordObservation([.. toolResults]);
-                
                 session.ResumeThinking();
             }
             // Not all models return a tool calls reason. Some will use finish reason stop or length to hand back
