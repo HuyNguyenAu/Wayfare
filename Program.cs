@@ -7,11 +7,30 @@ namespace WayFare;
 
 public class Program
 {
-    public static async Task Main(string[] args)
+    private static readonly string _modelNameKey = "WAYFARE_MODEL_NAME";
+    private static readonly string _apiKeyKey = "WAYFARE_API_KEY";
+    private static readonly string _endpointKey = "WAYFARE_ENDPOINT";
+    private static readonly string _toolsPathKey = "WAYFARE_TOOLS_PATH";
+    private static readonly string _compiledPathKey = "WAYFARE_COMPILED_PATH";
+
+    public static async Task Main()
     {
-        ChatClient chatClient = new("MODEL_NAME", new ApiKeyCredential("local-no-key-needed"), new OpenAIClientOptions()
+        DotNetEnv.Env.Load();
+
+        string modelName = Environment.GetEnvironmentVariable(_modelNameKey)
+            ?? throw new InvalidOperationException($"Model name must be specified in {_modelNameKey} environment variable.");
+        string apiKey = Environment.GetEnvironmentVariable(_apiKeyKey)
+            ?? throw new InvalidOperationException($"API key must be specified in {_apiKeyKey} environment variable.");
+        string endpoint = Environment.GetEnvironmentVariable(_endpointKey)
+            ?? throw new InvalidOperationException($"Endpoint must be specified in {_endpointKey} environment variable.");
+        string toolsPath = Environment.GetEnvironmentVariable(_toolsPathKey)
+            ?? throw new InvalidOperationException($"Tools path must be specified in {_toolsPathKey} environment variable.");
+        string compiledPath = Environment.GetEnvironmentVariable(_compiledPathKey)
+            ?? throw new InvalidOperationException($"Compiled path must be specified in {_compiledPathKey} environment variable.");
+
+        ChatClient chatClient = new(modelName, new ApiKeyCredential(apiKey), new OpenAIClientOptions()
         {
-            Endpoint = new Uri("http://127.0.0.1:8080/")
+            Endpoint = new Uri(endpoint)
         });
         OpenAIClient openAIClient = new(chatClient);
 
@@ -29,7 +48,7 @@ public class Program
         Engine engine = new(session, openAIClient, agentEventPublisher);
 
         await agentEventPublisher.PublishAsync(new StartupStarted(), cancellationTokenSource.Token);
-        await toolManager.LoadToolsAsync(@"C:\Users\Kaze\source\repos\Wayfare\Tools", "*.cs", @"C:\Users\Kaze\source\repos\Wayfare\compiled", cancellationTokenSource.Token);
+        await toolManager.LoadToolsAsync(toolsPath, "*.cs", compiledPath, cancellationTokenSource.Token);
         await agentEventPublisher.PublishAsync(new StartupCompleted(), cancellationTokenSource.Token);
         await agentEventPublisher.PublishAsync(new StartAgent(), cancellationTokenSource.Token);
 

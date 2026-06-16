@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DotNetEnv" Version="3.2.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.3.0" />
     <PackageReference Include="NTokenizers" Version="6.1.1" />
     <PackageReference Include="NTokenizers.Extensions.Spectre.Console" Version="2.4.0" />
