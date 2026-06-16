@@ -7,7 +7,7 @@ internal interface IEngine
     Task RunCycleAsync(string userInput, CancellationToken cancellationToken);
 }
 
-internal class Engine(ISession session, IChatClient chatClient, IEventPublisher events) : IEngine
+internal class Engine(ISession session, IChatClient chatClient, IAgentEventPublisher agentEventPublisher) : IEngine
 {
     public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
     {
@@ -23,14 +23,14 @@ internal class Engine(ISession session, IChatClient chatClient, IEventPublisher 
                 statusDescription = $"Processing results from {string.Join(", ", toolNames)}...";
             }
 
-            events.Publish(new ChatRequestStarted(statusDescription));
+            await agentEventPublisher.PublishAsync(new ChatRequestStarted(statusDescription), cancellationToken);
             ChatResponse chatResponse = await chatClient.ChatAsync(
                 [.. session.Messages],
                 [.. session.GetTools()],
-                content => events.Publish(new ThoughtChunkReceived(content)),
+                content => agentEventPublisher.PublishAsync(new ThoughtChunkReceived(content), cancellationToken),
                 cancellationToken
             );
-            events.Publish(new ChatRequestCompleted());
+            await agentEventPublisher.PublishAsync(new ChatRequestCompleted(), cancellationToken);
             session.RecordThought(chatResponse.Content);
 
             if (chatResponse.ToolCalls.Length > 0)
@@ -64,11 +64,11 @@ internal class Engine(ISession session, IChatClient chatClient, IEventPublisher 
         try
         {
             ITool tool = session.GetTool(toolName);
-            events.Publish(new ToolExecutionStarted(tool.GetInvocationMessage(toolCall.Arguments)));
+            await agentEventPublisher.PublishAsync(new ToolExecutionStarted(tool.GetInvocationMessage(toolCall.Arguments)), cancellationToken);
             started = true;
             
             ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
-            events.Publish(new ToolExecutionCompleted(result.Success, toolName, result.DisplayMessage, result.Result, result.Error));
+            await agentEventPublisher.PublishAsync(new ToolExecutionCompleted(result.Success, toolName, result.DisplayMessage, result.Result, result.Error), cancellationToken);
 
             if (result.Success)
             {
@@ -83,10 +83,10 @@ internal class Engine(ISession session, IChatClient chatClient, IEventPublisher 
         {
             if (!started)
             {
-                events.Publish(new ToolExecutionStarted($"[{toolName}] [{toolCall.Arguments}]"));
+                await agentEventPublisher.PublishAsync(new ToolExecutionStarted($"[{toolName}] [{toolCall.Arguments}]"), cancellationToken);
             }
           
-            events.Publish(new ToolExecutionCompleted(false, toolName, $"An error occurred: {ex.Message}", string.Empty, ex.ToString()));
+            await agentEventPublisher.PublishAsync(new ToolExecutionCompleted(false, toolName, $"An error occurred: {ex.Message}", string.Empty, ex.ToString()), cancellationToken);
             return new ToolResult(toolCall.ToolId, toolName, $"Exception occurred while executing tool '{toolName}' because {ex}");
         }
     }

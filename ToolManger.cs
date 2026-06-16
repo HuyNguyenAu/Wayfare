@@ -19,7 +19,7 @@ internal interface IToolManager
     Task LoadToolsAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken);
 }
 
-internal sealed class ToolManager(IEventPublisher events) : IToolManager
+internal sealed class ToolManager(IAgentEventPublisher agentEventPublisher) : IToolManager
 {
     private readonly string[] _ignoreFiles = ["ITool.cs", "ToolHelpers.cs"];
 
@@ -64,7 +64,7 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
             throw new LoadToolException($"Failed to access tool directory '{directoryPath}' with search pattern '{searchPattern}'", ex);
         }
 
-        events.Publish(new LoadingToolsStarted());
+        await agentEventPublisher.PublishAsync(new LoadingToolsStarted(), cancellationToken);
 
         HashSet<string?> activeToolNames = toolFilePaths
             .Select(Path.GetFileNameWithoutExtension)
@@ -107,9 +107,9 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
             {
                 try
                 {
-                    events.Publish(new ToolCompilationStarted(toolName));
+                    await agentEventPublisher.PublishAsync(new ToolCompilationStarted(toolName), cancellationToken);
                     await CompileToolAsync(toolFilePath, dllPath, cancellationToken);
-                    events.Publish(new ToolCompilationCompleted());
+                    await agentEventPublisher.PublishAsync(new ToolCompilationCompleted(), cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -136,12 +136,12 @@ internal sealed class ToolManager(IEventPublisher events) : IToolManager
             try
             {
                 string toolName = Path.GetFileNameWithoutExtension(dllFilePath);
-                events.Publish(new ToolLoadingStarted(toolName));
+                await agentEventPublisher.PublishAsync(new ToolLoadingStarted(toolName), cancellationToken);
 
                 ITool tool = LoadTool(dllFilePath);
                 tools.Add(tool);
 
-                events.Publish(new ToolLoadingCompleted());
+                await agentEventPublisher.PublishAsync(new ToolLoadingCompleted(), cancellationToken);
             }
             catch (Exception ex)
             {

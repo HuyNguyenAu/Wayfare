@@ -4,138 +4,67 @@ namespace WayFare;
 
 internal interface ITerminalUI
 {
-    Task Startup(CancellationToken cancellationToken);
-    Task FinaliseStartup(CancellationToken cancellationToken);
-    void StartAgent();
     Task<string> GetUserInputAsync(CancellationToken cancellationToken);
 }
 
-internal class TerminalUI : ITerminalUI
+internal class TerminalUI : ITerminalUI, IAgentEventSubscriber
 {
     private bool _hasPrompted = false;
     private bool _isFirstThoughtChunk = true;
-    private readonly Lock _consoleLock = new();
 
-    public TerminalUI(IEventSubscriber events)
+    public TerminalUI()
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
         AnsiConsole.Clear();
-
-        events.Subscribe<LoadingToolsStarted>(_ => OnLoadingToolsStarted());
-        events.Subscribe<ToolCompilationStarted>(e => OnToolCompilationStarted(e.ToolName));
-        events.Subscribe<ToolCompilationCompleted>(_ => OnToolCompilationCompleted());
-        events.Subscribe<ToolLoadingStarted>(e => OnToolLoadingStarted(e.ToolName));
-        events.Subscribe<ToolLoadingCompleted>(_ => OnToolLoadingCompleted());
-
-        events.Subscribe<ChatRequestStarted>(e => OnChatRequestStarted(e));
-        events.Subscribe<ChatRequestCompleted>(_ => OnChatRequestCompleted());
-        events.Subscribe<ThoughtChunkReceived>(e => OnThoughtChunkReceived(e.Message));
-        events.Subscribe<ToolExecutionStarted>(e => OnToolExecutionStarted(e.InvocationMessage));
-        events.Subscribe<ToolExecutionCompleted>(OnToolExecutionCompleted);
     }
 
-    private void OnLoadingToolsStarted()
+    public async Task OnMessageAsync(IAgentEvent @event, CancellationToken cancellationToken)
     {
-        lock (_consoleLock)
+        switch (@event)
         {
-            AnsiConsole.MarkupLine("[cyan][[SYSTEM]][/] Initialising system tools...");
+            case StartupStarted:
+                await OnStartupStartedAsync(cancellationToken);
+                break;
+            case StartupCompleted:
+                await OnStartupCompletedAsync(cancellationToken);
+                break;
+            case StartAgent:
+                OnStartAgent();
+                break;
+            case LoadingToolsStarted:
+                OnLoadingToolsStarted();
+                break;
+            case ToolCompilationStarted toolCompilationStarted:
+                OnToolCompilationStarted(toolCompilationStarted.ToolName);
+                break;
+            case ToolCompilationCompleted:
+                OnToolCompilationCompleted();
+                break;
+            case ToolLoadingStarted toolLoadingStarted:
+                OnToolLoadingStarted(toolLoadingStarted.ToolName);
+                break;
+            case ToolLoadingCompleted:
+                OnToolLoadingCompleted();
+                break;
+            case ChatRequestStarted chatRequestStarted:
+                OnChatRequestStarted(chatRequestStarted);
+                break;
+            case ChatRequestCompleted:
+                OnChatRequestCompleted();
+                break;
+            case ThoughtChunkReceived thoughtChunkReceived:
+                OnThoughtChunkReceived(thoughtChunkReceived.Message);
+                break;
+            case ToolExecutionStarted toolExecutionStarted:
+                OnToolExecutionStarted(toolExecutionStarted.InvocationMessage);
+                break;
+            case ToolExecutionCompleted toolExecutionCompleted:
+                OnToolExecutionCompleted(toolExecutionCompleted);
+                break;
         }
     }
 
-    private void OnToolCompilationStarted(string toolName)
-    {
-        lock (_consoleLock)
-        {
-            AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Compiling {toolName}...")}");
-        }
-    }
-
-    private void OnToolCompilationCompleted()
-    {
-        lock (_consoleLock)
-        {
-            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
-        }
-    }
-
-    private void OnToolLoadingStarted(string toolName)
-    {
-        lock (_consoleLock)
-        {
-            AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Loading {toolName}...")}");
-        }
-    }
-
-    private void OnToolLoadingCompleted()
-    {
-        lock (_consoleLock)
-        {
-            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
-        }
-    }
-
-    private void OnChatRequestStarted(ChatRequestStarted e)
-    {
-        lock (_consoleLock)
-        {
-            AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape(e.Description)}");
-            _isFirstThoughtChunk = true;
-        }
-    }
-
-    private void OnChatRequestCompleted()
-    {
-        lock (_consoleLock)
-        {
-            if (_isFirstThoughtChunk)
-            {
-                AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
-                _isFirstThoughtChunk = false;
-            }
-        }
-    }
-
-    private void OnThoughtChunkReceived(string message)
-    {
-        lock (_consoleLock)
-        {
-            if (_isFirstThoughtChunk)
-            {
-                AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
-                _isFirstThoughtChunk = false;
-            }
-            AnsiConsole.Markup(Markup.Escape(message));
-        }
-    }
-
-    private void OnToolExecutionStarted(string invocationMessage)
-    {
-        lock (_consoleLock)
-        {
-            AnsiConsole.Markup($"[cyan][[SYSTEM]][/] Running {Markup.Escape(invocationMessage)}");
-        }
-    }
-
-    private void OnToolExecutionCompleted(ToolExecutionCompleted e)
-    {
-        lock (_consoleLock)
-        {
-            if (e.Success)
-            {
-                AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
-                AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
-            }
-            else
-            {
-                AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
-                AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
-            }
-
-            _isFirstThoughtChunk = true;
-        }
-    }
-
-    public async Task Startup(CancellationToken cancellationToken)
+    private static async Task OnStartupStartedAsync(CancellationToken cancellationToken)
     {
         AnsiConsole.MarkupLine("[bold white]WAYFARE INTERNATIONAL (C) 2026 // COGNITIVE AGENT DIVISION[/]");
         AnsiConsole.MarkupLine($"[cyan]SECURE LINK ESTABLISHED. STARTING BOOT SEQUENCE...[/]{Environment.NewLine}");
@@ -148,9 +77,9 @@ internal class TerminalUI : ITerminalUI
         await Task.Delay(random.Next(100, 225), cancellationToken);
     }
 
-    public async Task FinaliseStartup(CancellationToken cancellationToken)
+    private static async Task OnStartupCompletedAsync(CancellationToken cancellationToken)
     {
-        List<string> bootSequences =
+        string[] bootSequences =
         [
             "Finalising system checks...",
             "Establishing secure environment..."
@@ -168,7 +97,7 @@ internal class TerminalUI : ITerminalUI
         await Task.Delay(random.Next(100, 225), cancellationToken);
     }
 
-    public void StartAgent()
+    private static void OnStartAgent()
     {
         AnsiConsole.Clear();
         Grid grid = new();
@@ -181,6 +110,77 @@ internal class TerminalUI : ITerminalUI
 
         AnsiConsole.Write(grid);
         AnsiConsole.Write(new Rule().RuleStyle("yellow"));
+    }
+
+    private static void OnLoadingToolsStarted()
+    {
+        AnsiConsole.MarkupLine("[cyan][[SYSTEM]][/] Initialising system tools...");
+    }
+
+    private static void OnToolCompilationStarted(string toolName)
+    {
+        AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Compiling {toolName}...")}");
+    }
+
+    private static void OnToolCompilationCompleted()
+    {
+        AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+    }
+
+    private static void OnToolLoadingStarted(string toolName)
+    {
+        AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Loading {toolName}...")}");
+    }
+
+    private static void OnToolLoadingCompleted()
+    {
+        AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+    }
+
+    private void OnChatRequestStarted(ChatRequestStarted e)
+    {
+        AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape(e.Description)}");
+        _isFirstThoughtChunk = true;
+    }
+
+    private void OnChatRequestCompleted()
+    {
+        if (_isFirstThoughtChunk)
+        {
+            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+            _isFirstThoughtChunk = false;
+        }
+    }
+
+    private void OnThoughtChunkReceived(string message)
+    {
+        if (_isFirstThoughtChunk)
+        {
+            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+            _isFirstThoughtChunk = false;
+        }
+        AnsiConsole.Markup(Markup.Escape(message));
+    }
+
+    private static void OnToolExecutionStarted(string invocationMessage)
+    {
+        AnsiConsole.Markup($"[cyan][[SYSTEM]][/] Running {Markup.Escape(invocationMessage)}");
+    }
+
+    private void OnToolExecutionCompleted(ToolExecutionCompleted e)
+    {
+        if (e.Success)
+        {
+            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+            AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
+            AnsiConsole.MarkupLine($"[cyan][[SYSTEM]][/] {Markup.Escape(e.DisplayMessage)}");
+        }
+
+        _isFirstThoughtChunk = true;
     }
 
     public Task<string> GetUserInputAsync(CancellationToken cancellationToken)
