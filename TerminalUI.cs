@@ -17,21 +17,84 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
     private bool _disposed = false;
     private bool _hasPrompted = false;
     private bool _isFirstThoughtChunk = true;
-    private readonly Pipe _thoughtChunkPipe = new();
-    private readonly Task _thoughtChunkReaderTask;
-    private readonly Channel<string> _thoughtChunkChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
-    private readonly Task _pipeWriterTask;
+
+    private readonly Channel<IRenderCommand> _renderChannel = Channel.CreateUnbounded<IRenderCommand>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Task _renderLoopTask;
+
+    private Pipe? _currentMarkdownPipe;
+    private Task? _currentMarkdownTask;
 
     public TerminalUI(CancellationToken cancellationToken)
     {
         Console.OutputEncoding = Encoding.UTF8;
         AnsiConsole.Clear();
 
-        _pipeWriterTask = Task.Run(() => WriteToPipeLoopAsync(cancellationToken), cancellationToken);
-        _thoughtChunkReaderTask = Task.Run(() => AnsiConsole.Console.WriteMarkdownAsync(_thoughtChunkPipe.Reader.AsStream(), MarkdownStyles.Default, Encoding.UTF8, cancellationToken), cancellationToken);
+        _renderLoopTask = Task.Run(() => ProcessRenderQueueAsync(cancellationToken), cancellationToken);
     }
 
     public async Task OnMessageAsync(IAgentEvent @event, CancellationToken cancellationToken)
+    {
+        await _renderChannel.Writer.WriteAsync(new RenderEvent(@event), cancellationToken);
+    }
+
+    public async Task<string> GetUserInputAsync(CancellationToken cancellationToken)
+    {
+        TaskCompletionSource<string> taskCompletionSource = new();
+        using CancellationTokenRegistration registration = cancellationToken.Register(() => taskCompletionSource.TrySetCanceled(cancellationToken));
+
+        await _renderChannel.Writer.WriteAsync(new RenderPrompt(taskCompletionSource), cancellationToken);
+        return await taskCompletionSource.Task;
+    }
+
+    private async Task ProcessRenderQueueAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (IRenderCommand command in _renderChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                switch (command)
+                {
+                    case RenderEvent e:
+                        await HandleEventAsync(e.Event, cancellationToken);
+                        break;
+
+                    case RenderPrompt p:
+                        try
+                        {
+                            string input = await HandlePromptAsync(cancellationToken);
+                            p.TaskCompletionSource.TrySetResult(input);
+                        }
+                        catch (OperationCanceledException ex)
+                        {
+                            p.TaskCompletionSource.TrySetCanceled(ex.CancellationToken);
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            p.TaskCompletionSource.TrySetException(ex);
+                        }
+                        break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown. No action needed.
+        }
+        finally
+        {
+            // Cancel remaining commands so awaiters are not left hanging.
+            while (_renderChannel.Reader.TryRead(out IRenderCommand? command))
+            {
+                if (command is RenderPrompt p)
+                {
+                    p.TaskCompletionSource.TrySetCanceled(cancellationToken);
+                }
+            }
+        }
+    }
+
+    private async Task HandleEventAsync(IAgentEvent @event, CancellationToken cancellationToken)
     {
         switch (@event)
         {
@@ -66,10 +129,10 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
                 OnToolLoadingFailed(e.ToolName, e.Error);
                 break;
             case ChatRequestStarted e:
-                OnChatRequestStarted(e);
+                await OnChatRequestStartedAsync(e, cancellationToken);
                 break;
             case ChatRequestCompleted:
-                OnChatRequestCompleted();
+                await OnChatRequestCompletedAsync();
                 break;
             case ThoughtChunkReceived e:
                 await OnThoughtChunkReceivedAsync(e.Message, cancellationToken);
@@ -168,18 +231,47 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
         AnsiConsole.MarkupLine($"[red]Error loading {toolName}: {error}[/]");
     }
 
-    private void OnChatRequestStarted(ChatRequestStarted e)
+    private async Task OnChatRequestStartedAsync(ChatRequestStarted e, CancellationToken cancellationToken)
     {
         AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape(e.Description)}");
         _isFirstThoughtChunk = true;
+
+        _currentMarkdownPipe = new Pipe();
+        _currentMarkdownTask = Task.Run(() => AnsiConsole.Console.WriteMarkdownAsync(
+            _currentMarkdownPipe.Reader.AsStream(),
+            MarkdownStyles.Default,
+            Encoding.UTF8,
+            cancellationToken
+        ), cancellationToken);
+        await Task.CompletedTask;
     }
 
-    private void OnChatRequestCompleted()
+    private async Task OnChatRequestCompletedAsync()
     {
         if (_isFirstThoughtChunk)
         {
             AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
             _isFirstThoughtChunk = false;
+        }
+
+        if (_currentMarkdownPipe is not null)
+        {
+            await _currentMarkdownPipe.Writer.CompleteAsync();
+
+            if (_currentMarkdownTask is not null)
+            {
+                try
+                {
+                    await _currentMarkdownTask;
+                }
+                catch (Exception)
+                {
+                    // Ignore exceptions during cleanup.
+                }
+            }
+
+            _currentMarkdownPipe = null;
+            _currentMarkdownTask = null;
         }
     }
 
@@ -191,21 +283,11 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
             _isFirstThoughtChunk = false;
         }
 
-        await _thoughtChunkChannel.Writer.WriteAsync(message, cancellationToken);
-    }
-
-    private async Task WriteToPipeLoopAsync(CancellationToken cancellationToken)
-    {
-        try
+        if (_currentMarkdownPipe is not null)
         {
-            await foreach (string chunk in _thoughtChunkChannel.Reader.ReadAllAsync(cancellationToken))
-            {
-                await _thoughtChunkPipe.Writer.WriteAsync(Encoding.UTF8.GetBytes(chunk), cancellationToken);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected when cancelled.
+            byte[] bytes = Encoding.UTF8.GetBytes(message);
+            await _currentMarkdownPipe.Writer.WriteAsync(bytes, cancellationToken);
+            await _currentMarkdownPipe.Writer.FlushAsync(cancellationToken);
         }
     }
 
@@ -230,7 +312,7 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
         _isFirstThoughtChunk = true;
     }
 
-    public Task<string> GetUserInputAsync(CancellationToken cancellationToken)
+    private async Task<string> HandlePromptAsync(CancellationToken cancellationToken)
     {
         _isFirstThoughtChunk = true;
 
@@ -243,7 +325,7 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
             _hasPrompted = true;
         }
 
-        return AnsiConsole.PromptAsync(
+        return await AnsiConsole.PromptAsync(
             new TextPrompt<string>($"[bold red]{Environment.UserName}[/][bold white]://>[/]")
                 .PromptStyle("white")
                 .AllowEmpty(),
@@ -260,28 +342,39 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
 
         _disposed = true;
 
-        _thoughtChunkChannel.Writer.Complete();
+        _renderChannel.Writer.Complete();
 
         try
         {
-            await _pipeWriterTask;
+            await _renderLoopTask;
         }
         catch (Exception)
         {
             // Ignore any exceptions during task cleanup.
         }
 
-        _thoughtChunkPipe.Writer.Complete();
-        _thoughtChunkPipe.Reader.Complete();
-
-        try
+        if (_currentMarkdownPipe is not null)
         {
-            await _pipeWriterTask;
-            await _thoughtChunkReaderTask;
+            _currentMarkdownPipe.Writer.Complete();
+            _currentMarkdownPipe.Reader.Complete();
         }
-        catch (Exception)
+
+        if (_currentMarkdownTask is not null)
         {
-            // Ignore any exceptions during task cleanup.
+            try
+            {
+                await _currentMarkdownTask;
+            }
+            catch (Exception)
+            {
+                // Ignore any exceptions during task cleanup.
+            }
         }
     }
+
+    internal interface IRenderCommand;
+
+    internal record RenderEvent(IAgentEvent Event) : IRenderCommand;
+
+    internal record RenderPrompt(TaskCompletionSource<string> TaskCompletionSource) : IRenderCommand;
 }
