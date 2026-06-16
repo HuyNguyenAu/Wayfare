@@ -34,32 +34,38 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber
             case LoadingToolsStarted:
                 OnLoadingToolsStarted();
                 break;
-            case ToolCompilationStarted toolCompilationStarted:
-                OnToolCompilationStarted(toolCompilationStarted.ToolName);
+            case ToolCompilationStarted e:
+                OnToolCompilationStarted(e.ToolName);
                 break;
             case ToolCompilationCompleted:
                 OnToolCompilationCompleted();
                 break;
-            case ToolLoadingStarted toolLoadingStarted:
-                OnToolLoadingStarted(toolLoadingStarted.ToolName);
+            case ToolCompilationFailed e:
+                OnToolCompilationFailed(e.ToolName, e.Error);
+                break;
+            case ToolLoadingStarted e:
+                OnToolLoadingStarted(e.ToolName);
                 break;
             case ToolLoadingCompleted:
                 OnToolLoadingCompleted();
                 break;
-            case ChatRequestStarted chatRequestStarted:
-                OnChatRequestStarted(chatRequestStarted);
+            case ToolLoadingFailed e:
+                OnToolLoadingFailed(e.ToolName, e.Error);
+                break;
+            case ChatRequestStarted e:
+                OnChatRequestStarted(e);
                 break;
             case ChatRequestCompleted:
                 OnChatRequestCompleted();
                 break;
-            case ThoughtChunkReceived thoughtChunkReceived:
-                OnThoughtChunkReceived(thoughtChunkReceived.Message);
+            case ThoughtChunkReceived e:
+                OnThoughtChunkReceived(e.Message);
                 break;
-            case ToolExecutionStarted toolExecutionStarted:
-                OnToolExecutionStarted(toolExecutionStarted.InvocationMessage);
+            case ToolExecutionStarted e:
+                OnToolExecutionStarted(e.InvocationMessage);
                 break;
-            case ToolExecutionCompleted toolExecutionCompleted:
-                OnToolExecutionCompleted(toolExecutionCompleted);
+            case ToolExecutionCompleted e:
+                OnToolExecutionCompleted(e);
                 break;
         }
     }
@@ -127,6 +133,12 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber
         AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
     }
 
+    private static void OnToolCompilationFailed(string toolName, string error)
+    {
+        AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
+        AnsiConsole.MarkupLine($"[red]Error compiling {toolName}: {error}[/]");
+    }
+
     private static void OnToolLoadingStarted(string toolName)
     {
         AnsiConsole.Markup($"[cyan][[SYSTEM]][/] {Markup.Escape($"Loading {toolName}...")}");
@@ -135,6 +147,12 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber
     private static void OnToolLoadingCompleted()
     {
         AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+    }
+
+    private static void OnToolLoadingFailed(string toolName, string error)
+    {
+        AnsiConsole.MarkupLine(" [bold red][[FAILED]][/]");
+        AnsiConsole.MarkupLine($"[red]Error loading {toolName}: {error}[/]");
     }
 
     private void OnChatRequestStarted(ChatRequestStarted e)
