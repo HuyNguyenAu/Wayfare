@@ -1,4 +1,5 @@
 using System.IO.Pipelines;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Channels;
 using NTokenizers.Extensions.Spectre.Console;
@@ -20,6 +21,7 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
 
     private readonly Channel<IRenderCommand> _renderChannel = Channel.CreateUnbounded<IRenderCommand>(new UnboundedChannelOptions { SingleReader = true });
     private readonly Task _renderLoopTask;
+    private Exception? _renderLoopException;
 
     private Pipe? _currentMarkdownPipe;
     private Task? _currentMarkdownTask;
@@ -34,16 +36,37 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
 
     public async Task OnMessageAsync(IAgentEvent @event, CancellationToken cancellationToken)
     {
-        await _renderChannel.Writer.WriteAsync(new RenderEvent(@event), cancellationToken);
+        await ThrowIfRenderLoopFaultedAsync();
+        TaskCompletionSource taskCompletionSource = new();
+        using CancellationTokenRegistration registration = cancellationToken.Register(() => taskCompletionSource.TrySetCanceled(cancellationToken));
+
+        await _renderChannel.Writer.WriteAsync(new RenderEvent(@event, taskCompletionSource), cancellationToken);
+        await ThrowIfRenderLoopFaultedAsync();
     }
 
     public async Task<string> GetUserInputAsync(CancellationToken cancellationToken)
     {
+        await ThrowIfRenderLoopFaultedAsync();
         TaskCompletionSource<string> taskCompletionSource = new();
         using CancellationTokenRegistration registration = cancellationToken.Register(() => taskCompletionSource.TrySetCanceled(cancellationToken));
 
         await _renderChannel.Writer.WriteAsync(new RenderPrompt(taskCompletionSource), cancellationToken);
+
+        await ThrowIfRenderLoopFaultedAsync();
         return await taskCompletionSource.Task;
+    }
+
+    private async Task ThrowIfRenderLoopFaultedAsync()
+    {
+        if (_renderLoopException is not null)
+        {
+            ExceptionDispatchInfo.Capture(_renderLoopException).Throw();
+        }
+
+        if (_renderLoopTask.IsFaulted)
+        {
+            await _renderLoopTask;
+        }
     }
 
     private async Task ProcessRenderQueueAsync(CancellationToken cancellationToken)
@@ -55,7 +78,21 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
                 switch (command)
                 {
                     case RenderEvent e:
-                        await HandleEventAsync(e.Event, cancellationToken);
+                        try
+                        {
+                            await HandleEventAsync(e.Event, cancellationToken);
+                            e.TaskCompletionSource.TrySetResult();
+                        }
+                        catch (OperationCanceledException ex)
+                        {
+                            e.TaskCompletionSource.TrySetCanceled(ex.CancellationToken);
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            e.TaskCompletionSource.TrySetException(ex);
+                            throw;
+                        }
                         break;
 
                     case RenderPrompt p:
@@ -81,16 +118,10 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
         {
             // Expected during shutdown. No action needed.
         }
-        finally
+        catch (Exception ex)
         {
-            // Cancel remaining commands so awaiters are not left hanging.
-            while (_renderChannel.Reader.TryRead(out IRenderCommand? command))
-            {
-                if (command is RenderPrompt p)
-                {
-                    p.TaskCompletionSource.TrySetCanceled(cancellationToken);
-                }
-            }
+            _renderLoopException = ex;
+            throw;
         }
     }
 
@@ -374,7 +405,7 @@ internal class TerminalUI : ITerminalUI, IAgentEventSubscriber, IAsyncDisposable
 
     internal interface IRenderCommand;
 
-    internal record RenderEvent(IAgentEvent Event) : IRenderCommand;
+    internal record RenderEvent(IAgentEvent Event, TaskCompletionSource TaskCompletionSource) : IRenderCommand;
 
     internal record RenderPrompt(TaskCompletionSource<string> TaskCompletionSource) : IRenderCommand;
 }
