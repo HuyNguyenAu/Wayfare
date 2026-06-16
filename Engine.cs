@@ -27,7 +27,7 @@ internal class Engine(ISession session, IChatClient chatClient, IAgentEventPubli
             ChatResponse chatResponse = await chatClient.ChatAsync(
                 [.. session.Messages],
                 [.. session.GetTools()],
-                content => agentEventPublisher.PublishAsync(new ThoughtChunkReceived(content), cancellationToken),
+                async content => await agentEventPublisher.PublishAsync(new ThoughtChunkReceived(content), cancellationToken),
                 cancellationToken
             );
             await agentEventPublisher.PublishAsync(new ChatRequestCompleted(), cancellationToken);
