@@ -1,7 +1,6 @@
 using System.IO.Pipelines;
 using System.Text;
 using NTokenizers.Extensions.Spectre.Console;
-using NTokenizers.Extensions.Spectre.Console.Styles;
 using Spectre.Console;
 
 namespace Wayfare.UI.Components;
@@ -20,7 +19,7 @@ public class MarkdownStreamRenderer
         _markdownPipe = new Pipe();
         _markdownTask = Task.Run(() => AnsiConsole.Console.WriteMarkdownAsync(
             _markdownPipe.Reader.AsStream(),
-            MarkdownStyles.Default,
+            Palette.CreateMarkdownStyles(),
             Encoding.UTF8,
             cancellationToken
         ), cancellationToken);
@@ -30,7 +29,7 @@ public class MarkdownStreamRenderer
     {
         if (_isFirstChunk)
         {
-            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+            AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
             _isFirstChunk = false;
         }
 
@@ -46,7 +45,7 @@ public class MarkdownStreamRenderer
     {
         if (_isFirstChunk)
         {
-            AnsiConsole.MarkupLine(" [bold green][[OK]][/]");
+            AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
             _isFirstChunk = false;
         }
 

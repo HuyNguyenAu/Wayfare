@@ -47,9 +47,14 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
             _hasPrompted = true;
         }
 
+        string promptMarkup = $"[{Palette.HexLightPeach}]{Environment.UserName}[/]" +
+                              $"[{Palette.HexDarkGray}]@[/]" +
+                              $"[{Palette.HexDarkGreen}]wayfare-grid[/]" +
+                              $"[{Palette.HexOrange}] ❯[/] ";
+
         return await AnsiConsole.PromptAsync(
-            new TextPrompt<string>($"[bold red]{Environment.UserName}[/][bold white]://>[/]")
-                .PromptStyle("white")
+            new TextPrompt<string>(promptMarkup)
+                .PromptStyle(new Style(foreground: Palette.White))
                 .AllowEmpty(),
             cancellationToken
         );
@@ -82,7 +87,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]UI Event Processing Error: {Markup.Escape(ex.Message)}[/]");
+            AnsiConsole.MarkupLine($"[{Palette.HexRed}]UI Event Processing Error: {Markup.Escape(ex.Message)}[/]");
         }
         finally
         {
