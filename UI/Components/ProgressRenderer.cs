@@ -4,37 +4,18 @@ namespace Wayfare.UI.Components;
 
 public static class ProgressRenderer
 {
-    public static async Task RenderStartupStartedAsync(CancellationToken cancellationToken)
+    public static void RenderStartupStarted()
     {
-        AnsiConsole.MarkupLine($"[{Palette.HexOrange}][bold]WAYFARE // ECO-COGNITIVE SYSTEM v1.0[/][/]");
-        AnsiConsole.MarkupLine($"[{Palette.HexDarkGreen}]SOLAR ARRAY: ONLINE // COGNITIVE GRID: ACTIVE[/]{Environment.NewLine}");
-
-        Random random = new();
-
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[SYSTEM]][/] {Markup.Escape("Initialising hardware components...")}");
-        await Task.Delay(random.Next(200, 550), cancellationToken);
-        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
-        await Task.Delay(random.Next(100, 225), cancellationToken);
+        AnsiConsole.MarkupLine($"[{Palette.HexOrange}][bold]WAYFARE // SOLAR PUNK SANCTUARY v1.0[/][/]");
+        AnsiConsole.MarkupLine($"[{Palette.HexDarkGreen}]SOLAR ARRAY: CHARGED // HARMONIC GRID: ONLINE[/]{Environment.NewLine}");
+        AnsiConsole.Markup($"[{Palette.HexBlue}][[SANCTUARY]][/] {Markup.Escape("Nurturing local environment...")}");
+        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[HARMONIZED]][/][/]");
     }
 
-    public static async Task RenderStartupCompletedAsync(CancellationToken cancellationToken)
+    public static void RenderStartupCompleted()
     {
-        string[] bootSequences =
-        [
-            "Finalising system checks...",
-            "Establishing secure environment..."
-        ];
-
-        Random random = new();
-
-        foreach (string bootSequence in bootSequences)
-        {
-            AnsiConsole.Markup($"[{Palette.HexBlue}][[SYSTEM]][/] {Markup.Escape(bootSequence)}");
-            await Task.Delay(random.Next(200, 550), cancellationToken);
-            AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
-        }
-
-        await Task.Delay(random.Next(100, 225), cancellationToken);
+        AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[SANCTUARY]][/] {Markup.Escape("Synchronising sanctuary network...")} [{Palette.HexDarkGreen}][bold][[HARMONIZED]][/][/]");
+        AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[SANCTUARY]][/] {Markup.Escape("Opening safe & collaborative space...")} [{Palette.HexDarkGreen}][bold][[HARMONIZED]][/][/]");
     }
 
     public static void RenderStartAgent()
@@ -45,8 +26,8 @@ public static class ProgressRenderer
         grid.AddColumn();
         grid.AddColumn(new GridColumn().RightAligned());
         grid.AddRow(
-            new Markup($"[{Palette.HexOrange}][bold]▲ WAYFARE AGENT v0.1[/][/]"),
-            new Markup($"[{Palette.HexDarkGreen}][bold][[ONLINE // SOLAR POWER 100%]][/][/]")
+            new Markup($"[{Palette.HexOrange}][bold]▲ WAYFARE // SANCTUARY COMPANION v1.0[/][/]"),
+            new Markup($"[{Palette.HexDarkGreen}][bold][[SUSTAINABLE ENERGY 100% // READY]][/][/]")
         );
 
         AnsiConsole.Write(grid);
@@ -55,62 +36,62 @@ public static class ProgressRenderer
 
     public static void RenderLoadingToolsStarted()
     {
-        AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[SYSTEM]][/] Initialising system tools...");
+        AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[SANCTUARY]][/] Gathering sanctuary tools...");
     }
 
     public static void RenderToolCompilationStarted(string toolName)
     {
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[SYSTEM]][/] {Markup.Escape($"Compiling {toolName}...")}");
+        AnsiConsole.Markup($"[{Palette.HexBlue}][[SANCTUARY]][/] {Markup.Escape($"Preparing {toolName}...")}");
     }
 
     public static void RenderToolCompilationCompleted()
     {
-        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
+        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[HARMONIZED]][/][/]");
     }
 
     public static void RenderToolCompilationFailed(string toolName, string error)
     {
-        AnsiConsole.MarkupLine($" [{Palette.HexRed}][bold][[FAILED]][/][/]");
-        AnsiConsole.MarkupLine($"[{Palette.HexRed}]Error compiling {toolName}: {error}[/]");
+        AnsiConsole.MarkupLine($" [{Palette.HexRed}][bold][[WILTED]][/][/]");
+        AnsiConsole.MarkupLine($"[{Palette.HexRed}]Issue preparing {toolName}: {error}[/]");
     }
 
     public static void RenderToolLoadingStarted(string toolName)
     {
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[SYSTEM]][/] {Markup.Escape($"Loading {toolName}...")}");
+        AnsiConsole.Markup($"[{Palette.HexBlue}][[SANCTUARY]][/] {Markup.Escape($"Welcoming {toolName}...")}");
     }
 
     public static void RenderToolLoadingCompleted()
     {
-        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
+        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[HARMONIZED]][/][/]");
     }
 
     public static void RenderToolLoadingFailed(string toolName, string error)
     {
-        AnsiConsole.MarkupLine($" [{Palette.HexRed}][bold][[FAILED]][/][/]");
-        AnsiConsole.MarkupLine($"[{Palette.HexRed}]Error loading {toolName}: {error}[/]");
+        AnsiConsole.MarkupLine($" [{Palette.HexRed}][bold][[WILTED]][/][/]");
+        AnsiConsole.MarkupLine($"[{Palette.HexRed}]Issue welcoming {toolName}: {error}[/]");
     }
 
     public static void RenderChatRequestStarted(string description)
     {
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[SYSTEM]][/] {Markup.Escape(description)}");
+        AnsiConsole.Markup($"[{Palette.HexBlue}][[SANCTUARY]][/] {Markup.Escape(description)}");
     }
 
     public static void RenderToolExecutionStarted(string invocationMessage)
     {
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[SYSTEM]][/] Running {Markup.Escape(invocationMessage)}");
+        AnsiConsole.Markup($"[{Palette.HexBlue}][[SANCTUARY]][/] Engaging {Markup.Escape(invocationMessage)}");
     }
 
     public static void RenderToolExecutionCompleted(bool success, string displayMessage)
     {
         if (success)
         {
-            AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
-            AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[SYSTEM]][/] [{Palette.HexWhite}]{Markup.Escape(displayMessage)}[/]");
+            AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[HARMONIZED]][/][/]");
+            AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[SANCTUARY]][/] [{Palette.HexWhite}]{Markup.Escape(displayMessage)}[/]");
         }
         else
         {
-            AnsiConsole.MarkupLine($" [{Palette.HexRed}][bold][[FAILED]][/][/]");
-            AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[SYSTEM]][/] [{Palette.HexRed}]{Markup.Escape(displayMessage)}[/]");
+            AnsiConsole.MarkupLine($" [{Palette.HexRed}][bold][[WILTED]][/][/]");
+            AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[SANCTUARY]][/] [{Palette.HexRed}]{Markup.Escape(displayMessage)}[/]");
         }
     }
 }

@@ -47,10 +47,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
             _hasPrompted = true;
         }
 
-        string promptMarkup = $"[{Palette.HexLightPeach}]{Environment.UserName}[/]" +
-                              $"[{Palette.HexDarkGray}]@[/]" +
-                              $"[{Palette.HexDarkGreen}]wayfare-grid[/]" +
-                              $"[{Palette.HexOrange}] ❯[/] ";
+        string promptMarkup = $"[{Palette.HexLightPeach}]wayfarer[/][{Palette.HexOrange}] ❯[/] ";
 
         return await AnsiConsole.PromptAsync(
             new TextPrompt<string>(promptMarkup)
@@ -110,10 +107,10 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         switch (@event)
         {
             case StartupStartedEvent:
-                await ProgressRenderer.RenderStartupStartedAsync(cancellationToken);
+                ProgressRenderer.RenderStartupStarted();
                 break;
             case StartupCompletedEvent:
-                await ProgressRenderer.RenderStartupCompletedAsync(cancellationToken);
+                ProgressRenderer.RenderStartupCompleted();
                 break;
             case AgentStartedEvent:
                 ProgressRenderer.RenderStartAgent();
