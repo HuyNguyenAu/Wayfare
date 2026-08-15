@@ -1,56 +1,31 @@
-
 using System.ClientModel;
 using OpenAI;
 using OpenAI.Chat;
+using Wayfare.Core;
+using Wayfare.Core.Abstractions;
+using Wayfare.Core.Events;
+using Wayfare.Core.Models;
+using Wayfare.Core.Prompts;
+using Wayfare.Infrastructure.Configuration;
+using Wayfare.Infrastructure.Events;
+using Wayfare.Persistence;
+using Wayfare.Tools;
+using Wayfare.UI;
 
-namespace WayFare;
+namespace Wayfare;
 
 public class Program
 {
-    private static readonly string _modelNameKey = "WAYFARE_MODEL_NAME";
-    private static readonly string _apiKeyKey = "WAYFARE_API_KEY";
-    private static readonly string _endpointKey = "WAYFARE_ENDPOINT";
-    private static readonly string _toolsPathKey = "WAYFARE_TOOLS_PATH";
-    private static readonly string _compiledDirectoryKey = "WAYFARE_COMPILED_DIRECTORY";
-    private static readonly string _sessionsDirectoryKey = "WAYFARE_SESSIONS_DIRECTORY";
-
     public static async Task Main()
     {
-        DotNetEnv.Env.Load();
+        Settings settings = Settings.FromEnvironment();
 
-        string modelName = Environment.GetEnvironmentVariable(_modelNameKey)
-            ?? throw new InvalidOperationException($"Model name must be specified in {_modelNameKey} environment variable.");
-        string apiKey = Environment.GetEnvironmentVariable(_apiKeyKey)
-            ?? throw new InvalidOperationException($"API key must be specified in {_apiKeyKey} environment variable.");
-        string endpoint = Environment.GetEnvironmentVariable(_endpointKey)
-            ?? throw new InvalidOperationException($"Endpoint must be specified in {_endpointKey} environment variable.");
-        string toolsPath = Environment.GetEnvironmentVariable(_toolsPathKey)
-            ?? throw new InvalidOperationException($"Tools path must be specified in {_toolsPathKey} environment variable.");
-        string compiledDirectory = Environment.GetEnvironmentVariable(_compiledDirectoryKey)
-            ?? throw new InvalidOperationException($"Compiled directory must be specified in {_compiledDirectoryKey} environment variable.");
-        string sessionsDirectory = Environment.GetEnvironmentVariable(_sessionsDirectoryKey)
-            ?? throw new InvalidOperationException($"Sessions directory must be specified in {_sessionsDirectoryKey} environment variable.");
-
-        if (string.IsNullOrEmpty(toolsPath))
-        {
-            throw new InvalidOperationException("Tools path must be specified.");
-        }
-
-        if (string.IsNullOrEmpty(compiledDirectory))
-        {
-            throw new InvalidOperationException("Compiled directory must be specified.");
-        }
-
-        if (string.IsNullOrEmpty(sessionsDirectory))
-        {
-            throw new InvalidOperationException("Sessions directory must be specified.");
-        }
-
-        ChatClient chatClient = new(modelName, new ApiKeyCredential(apiKey), new OpenAIClientOptions()
-        {
-            Endpoint = new Uri(endpoint)
-        });
-        OpenAIClient openAIClient = new(chatClient);
+        ChatClient innerChatClient = new(
+            settings.ModelName,
+            new ApiKeyCredential(settings.ApiKey),
+            new OpenAIClientOptions { Endpoint = new Uri(settings.Endpoint) }
+        );
+        IChatClient chatClient = new Wayfare.Infrastructure.Clients.OpenAIClient(innerChatClient);
 
         CancellationTokenSource cancellationTokenSource = new();
         Console.CancelKeyPress += (sender, eventArgs) =>
@@ -59,23 +34,28 @@ public class Program
             cancellationTokenSource.Cancel();
         };
 
-        await using TerminalUI terminalUI = new(cancellationTokenSource.Token);
-        AgentEventPublisher agentEventPublisher = new([terminalUI]);
-        ToolManager toolManager = new(agentEventPublisher);
-        Session session = new(toolManager, sessionsDirectory);
-        Engine engine = new(session, openAIClient, agentEventPublisher);
+        IEventBroker eventBroker = new EventBroker();
+        await using TerminalUI terminalUI = new(eventBroker, cancellationTokenSource.Token);
+        IToolManager toolManager = new ToolManager(eventBroker);
+        ISessionStore sessionStore = new SessionStore(settings.SessionsDirectory);
 
-        await agentEventPublisher.PublishAsync(new StartupStarted(), cancellationTokenSource.Token);
-        await toolManager.LoadToolsAsync(toolsPath, "*.cs", compiledDirectory, cancellationTokenSource.Token);
-        await agentEventPublisher.PublishAsync(new StartupCompleted(), cancellationTokenSource.Token);
-        await agentEventPublisher.PublishAsync(new StartAgent(), cancellationTokenSource.Token);
+        eventBroker.Publish(new StartupStartedEvent());
+        await toolManager.LoadToolsAsync(settings.ToolsPath, "*.cs", settings.CompiledDirectory, cancellationTokenSource.Token);
+        eventBroker.Publish(new StartupCompletedEvent());
+        eventBroker.Publish(new AgentStartedEvent());
+
+        string systemPrompt = SystemPromptBuilder.Build(toolManager.Tools);
+        ISession session = new Session(systemPrompt);
+        await sessionStore.AppendMessageAsync(session.Messages[0], cancellationTokenSource.Token);
+
+        IOrchestrator orchestrator = new Orchestrator(session, chatClient, toolManager, sessionStore, eventBroker);
 
         try
         {
             while (!cancellationTokenSource.Token.IsCancellationRequested)
             {
                 string userInput = await terminalUI.GetUserInputAsync(cancellationTokenSource.Token);
-                await engine.RunCycleAsync(userInput, cancellationTokenSource.Token);
+                await orchestrator.RunCycleAsync(userInput, cancellationTokenSource.Token);
             }
         }
         catch (OperationCanceledException)
@@ -87,6 +67,8 @@ public class Program
         }
         finally
         {
+            eventBroker.Complete();
+            await terminalUI.WaitForCompletionAsync();
             await cancellationTokenSource.CancelAsync();
         }
     }

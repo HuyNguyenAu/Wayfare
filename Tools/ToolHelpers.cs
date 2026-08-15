@@ -1,14 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Wayfare.Core.Abstractions;
 
-namespace WayFare.Tools;
-
-public interface IToolHelpers
-{
-    bool TryDeserializeArguments<T>(string arguments, [NotNullWhen(true)] out T? args, [NotNullWhen(false)] out string? errorMessage) where T : class;
-    bool TryGetRequiredPath(string? path, [NotNullWhen(true)] out string? resolvedPath, [NotNullWhen(false)] out string? errorMessage);
-    void EnsureDirectoryExists(string filePath);
-}
+namespace Wayfare.Tools;
 
 public class ToolHelpers : IToolHelpers
 {
@@ -87,8 +81,7 @@ public class ToolHelpers : IToolHelpers
         {
             return;
         }
-        
+
         Directory.CreateDirectory(directory);
     }
 }
-
