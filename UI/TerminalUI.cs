@@ -22,6 +22,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
     private readonly IEventBroker _eventBroker;
     private readonly Task _eventLoopTask;
     private readonly MarkdownStreamRenderer _markdownStreamRenderer;
+    private readonly TaskCompletionSource _agentReadyTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public TerminalUI(IEventBroker eventBroker, CancellationToken cancellationToken)
     {
@@ -35,6 +36,8 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
 
     public async Task<string> GetUserInputAsync(CancellationToken cancellationToken)
     {
+        await _agentReadyTaskCompletionSource.Task.WaitAsync(cancellationToken);
+
         if (_hasPrompted)
         {
             AnsiConsole.WriteLine(Environment.NewLine);
@@ -83,6 +86,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         }
         finally
         {
+            _agentReadyTaskCompletionSource.TrySetResult();
             await _markdownStreamRenderer.CompleteStreamAsync();
         }
     }
@@ -108,6 +112,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
                 break;
             case AgentStartedEvent:
                 ProgressRenderer.RenderStartAgent();
+                _agentReadyTaskCompletionSource.TrySetResult();
                 break;
             case ToolCompilationStartedEvent e:
                 EnsureToolsHeaderRendered();
@@ -162,6 +167,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         }
 
         _disposed = true;
+        _agentReadyTaskCompletionSource.TrySetResult();
 
         _eventBroker.Complete();
 
