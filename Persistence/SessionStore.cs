@@ -38,7 +38,7 @@ public class SessionStore : ISessionStore
         {
             string json = JsonSerializer.Serialize(message, SerializerOptions);
 
-            await using var stream = new FileStream(
+            await using FileStream stream = new(
                 CurrentFilePath,
                 FileMode.Append,
                 FileAccess.Write,
@@ -46,7 +46,7 @@ public class SessionStore : ISessionStore
                 bufferSize: 4096,
                 useAsync: true);
 
-            await using var writer = new StreamWriter(stream, Encoding.UTF8);
+            await using StreamWriter writer = new(stream, Encoding.UTF8);
             await writer.WriteLineAsync(json.AsMemory(), cancellationToken);
         }
         catch (Exception ex) when (ex is IOException or JsonException)
@@ -66,7 +66,7 @@ public class SessionStore : ISessionStore
 
         try
         {
-            await using var stream = new FileStream(
+            await using FileStream stream = new(
                 CurrentFilePath,
                 FileMode.Open,
                 FileAccess.Read,
@@ -74,7 +74,7 @@ public class SessionStore : ISessionStore
                 bufferSize: 4096,
                 useAsync: true);
 
-            using var reader = new StreamReader(stream, Encoding.UTF8);
+            using StreamReader reader = new(stream, Encoding.UTF8);
             string? line;
 
             while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
