@@ -154,6 +154,8 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        GC.SuppressFinalize(this);
+
         if (_disposed)
         {
             return;

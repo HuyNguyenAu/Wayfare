@@ -1,11 +1,9 @@
 using System.ClientModel;
-using OpenAI;
-using OpenAI.Chat;
 using Wayfare.Core;
-using Wayfare.Core.Abstractions;
 using Wayfare.Core.Events;
 using Wayfare.Core.Models;
 using Wayfare.Core.Prompts;
+using Wayfare.Infrastructure.Clients;
 using Wayfare.Infrastructure.Configuration;
 using Wayfare.Infrastructure.Events;
 using Wayfare.Persistence;
@@ -20,12 +18,12 @@ public class Program
     {
         Settings settings = Settings.FromEnvironment();
 
-        ChatClient innerChatClient = new(
+        OpenAI.Chat.ChatClient chatClient = new(
             settings.ModelName,
             new ApiKeyCredential(settings.ApiKey),
-            new OpenAIClientOptions { Endpoint = new Uri(settings.Endpoint) }
+            new OpenAI.OpenAIClientOptions { Endpoint = new Uri(settings.Endpoint) }
         );
-        IChatClient chatClient = new Wayfare.Infrastructure.Clients.OpenAIClient(innerChatClient);
+        OpenAIClient openAIClient = new(chatClient);
 
         CancellationTokenSource cancellationTokenSource = new();
         Console.CancelKeyPress += (sender, eventArgs) =>
@@ -34,10 +32,10 @@ public class Program
             cancellationTokenSource.Cancel();
         };
 
-        IEventBroker eventBroker = new EventBroker();
+        EventBroker eventBroker = new();
         await using TerminalUI terminalUI = new(eventBroker, cancellationTokenSource.Token);
-        IToolManager toolManager = new ToolManager(eventBroker);
-        ISessionStore sessionStore = new SessionStore(settings.SessionsDirectory);
+        ToolManager toolManager = new(eventBroker);
+        SessionStore sessionStore = new(settings.SessionsDirectory);
 
         eventBroker.Publish(new StartupStartedEvent());
         await toolManager.LoadToolsAsync(settings.ToolsPath, "*.cs", settings.CompiledDirectory, cancellationTokenSource.Token);
@@ -45,10 +43,10 @@ public class Program
         eventBroker.Publish(new AgentStartedEvent());
 
         string systemPrompt = SystemPromptBuilder.Build(toolManager.Tools);
-        ISession session = new Session(systemPrompt);
+        Session session = new(systemPrompt);
         await sessionStore.AppendMessageAsync(session.Messages[0], cancellationTokenSource.Token);
 
-        IOrchestrator orchestrator = new Orchestrator(session, chatClient, toolManager, sessionStore, eventBroker);
+        Orchestrator orchestrator = new(session, openAIClient, toolManager, sessionStore, eventBroker);
 
         try
         {
