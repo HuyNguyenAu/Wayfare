@@ -139,7 +139,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
                 ProgressRenderer.RenderToolLoadingFailed(e.ToolName, e.Error);
                 break;
             case ChatRequestStartedEvent e:
-                ProgressRenderer.RenderChatRequestStarted(e.Description);
+                ProgressRenderer.RenderChatRequestStarted(e.ToolNames);
                 _markdownStreamRenderer.StartStream(cancellationToken);
                 break;
             case ChatRequestCompletedEvent:

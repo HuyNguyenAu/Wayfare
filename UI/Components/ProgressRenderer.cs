@@ -71,9 +71,13 @@ public static class ProgressRenderer
         AnsiConsole.MarkupLine($"[{Palette.HexRed}]Issue welcoming {toolName}: {error}[/]");
     }
 
-    public static void RenderChatRequestStarted(string description)
+    public static void RenderChatRequestStarted(IReadOnlyList<string>? toolNames)
     {
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[SANCTUARY]][/] {Markup.Escape(description)}");
+        string statusDescription = (toolNames is not null && toolNames.Count > 0)
+            ? $"Harmonizing insights from {string.Join(", ", toolNames)}..."
+            : "Gathering thoughts...";
+
+        AnsiConsole.Markup($"[{Palette.HexBlue}][[SANCTUARY]][/] {Markup.Escape(statusDescription)}");
     }
 
     public static void RenderToolExecutionStarted(string invocationMessage)

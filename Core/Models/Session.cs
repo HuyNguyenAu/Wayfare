@@ -15,7 +15,7 @@ public class Session : ISession
         _messages = [new SystemMessage(systemPrompt)];
     }
 
-    public Session(IEnumerable<SessionMessage> initialMessages)
+    public Session(IReadOnlyList<SessionMessage> initialMessages)
     {
         _messages = [.. initialMessages];
     }

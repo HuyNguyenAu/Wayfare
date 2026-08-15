@@ -2,4 +2,4 @@ using Wayfare.Core.Abstractions;
 
 namespace Wayfare.Core.Events;
 
-public record ChatRequestStartedEvent(string Description) : IEvent;
+public record ChatRequestStartedEvent(IReadOnlyList<string> ToolNames) : IEvent;

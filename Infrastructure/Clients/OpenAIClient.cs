@@ -11,7 +11,7 @@ public class OpenAIClient(ChatClient client) : IChatClient
     public async IAsyncEnumerable<StreamingChatUpdate> StreamChatAsync(
         IReadOnlyList<SessionMessage> sessionMessages,
         IReadOnlyList<ITool> tools,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ChatCompletionOptions options = CreateChatCompletionOptions(tools);
         List<ChatMessage> messages = MapSessionMessagesToChatMessages(sessionMessages);
@@ -26,7 +26,7 @@ public class OpenAIClient(ChatClient client) : IChatClient
                 }
             }
 
-            foreach (OpenAI.Chat.StreamingChatToolCallUpdate toolCallUpdate in update.ToolCallUpdates)
+            foreach (StreamingChatToolCallUpdate toolCallUpdate in update.ToolCallUpdates)
             {
                 yield return new StreamingChatUpdate(
                     ToolCallUpdate: new StreamingToolCallChunk(
@@ -86,10 +86,10 @@ public class OpenAIClient(ChatClient client) : IChatClient
     {
         return finishReason switch
         {
-            OpenAI.Chat.ChatFinishReason.Stop => AgentFinishReason.Stop,
-            OpenAI.Chat.ChatFinishReason.Length => AgentFinishReason.Length,
-            OpenAI.Chat.ChatFinishReason.ContentFilter => AgentFinishReason.ContentFilter,
-            OpenAI.Chat.ChatFinishReason.ToolCalls => AgentFinishReason.ToolCalls,
+            ChatFinishReason.Stop => AgentFinishReason.Stop,
+            ChatFinishReason.Length => AgentFinishReason.Length,
+            ChatFinishReason.ContentFilter => AgentFinishReason.ContentFilter,
+            ChatFinishReason.ToolCalls => AgentFinishReason.ToolCalls,
             _ => throw new InvalidOperationException($"Unexpected finish reason: {finishReason}")
         };
     }

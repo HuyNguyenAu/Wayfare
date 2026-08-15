@@ -21,12 +21,12 @@ public sealed class EventBroker : IEventBroker
         _channel.Writer.TryWrite(@event);
     }
 
-    public ValueTask PublishAsync(IEvent @event, CancellationToken cancellationToken = default)
+    public ValueTask PublishAsync(IEvent @event, CancellationToken cancellationToken)
     {
         return _channel.Writer.WriteAsync(@event, cancellationToken);
     }
 
-    public IAsyncEnumerable<IEvent> ReadAllAsync(CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<IEvent> ReadAllAsync(CancellationToken cancellationToken)
     {
         return _channel.Reader.ReadAllAsync(cancellationToken);
     }

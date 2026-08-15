@@ -21,20 +21,26 @@ public class Orchestrator(
     public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
     {
         session.BeginThinking(userInput);
-        await sessionStore.AppendMessageAsync(session.Messages.Last(), cancellationToken);
+        await sessionStore.AppendMessageAsync(session.Messages[^1], cancellationToken);
         eventPublisher.Publish(new SessionUpdatedEvent());
 
         while (session.State != SessionState.Done && !cancellationToken.IsCancellationRequested)
         {
-            string statusDescription = "Compiling decision...";
+            IReadOnlyList<string> toolNames = [];
 
-            if (session.Messages.LastOrDefault() is ToolResultMessage toolResultMessage)
+            if (session.Messages[^1] is ToolResultMessage toolResultMessage)
             {
-                IReadOnlyList<string> toolNames = [.. toolResultMessage.Results.Select(r => r.ToolName)];
-                statusDescription = $"Processing results from {string.Join(", ", toolNames)}...";
+                List<string> names = new(toolResultMessage.Results.Count);
+
+                for (int i = 0; i < toolResultMessage.Results.Count; i++)
+                {
+                    names.Add(toolResultMessage.Results[i].ToolName);
+                }
+
+                toolNames = names;
             }
 
-            eventPublisher.Publish(new ChatRequestStartedEvent(statusDescription));
+            eventPublisher.Publish(new ChatRequestStartedEvent(toolNames));
 
             StringBuilder assembledContent = new();
             Dictionary<int, ToolCallBuilder> toolCallBuilders = [];
@@ -82,7 +88,7 @@ public class Orchestrator(
 
             eventPublisher.Publish(new ChatRequestCompletedEvent());
             session.RecordThought(assembledContent.ToString());
-            await sessionStore.AppendMessageAsync(session.Messages.Last(), cancellationToken);
+            await sessionStore.AppendMessageAsync(session.Messages[^1], cancellationToken);
             eventPublisher.Publish(new SessionUpdatedEvent());
 
             IReadOnlyList<ToolCall> toolCalls = [.. toolCallBuilders.Values.Select(builder => new ToolCall(builder.ToolId.ToString(), builder.Name.ToString(), builder.Args.ToString()))];
@@ -90,14 +96,14 @@ public class Orchestrator(
             if (toolCalls.Count > 0)
             {
                 session.RequestAction(toolCalls);
-                await sessionStore.AppendMessageAsync(session.Messages.Last(), cancellationToken);
+                await sessionStore.AppendMessageAsync(session.Messages[^1], cancellationToken);
                 eventPublisher.Publish(new SessionUpdatedEvent());
 
                 IReadOnlyList<Task<ToolExecutionResult>> executionTasks = [.. toolCalls.Select(tc => ExecuteToolAsync(tc, cancellationToken))];
                 IReadOnlyList<ToolExecutionResult> toolResults = await Task.WhenAll(executionTasks);
 
                 session.RecordObservation(toolResults);
-                await sessionStore.AppendMessageAsync(session.Messages.Last(), cancellationToken);
+                await sessionStore.AppendMessageAsync(session.Messages[^1], cancellationToken);
                 session.ResumeThinking();
                 eventPublisher.Publish(new SessionUpdatedEvent());
             }

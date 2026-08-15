@@ -32,7 +32,7 @@ public class SessionStore : ISessionStore
         CurrentFilePath = Path.Combine(SessionsDirectory, $"{SessionId}.jsonl");
     }
 
-    public async Task AppendMessageAsync(SessionMessage message, CancellationToken cancellationToken = default)
+    public async Task AppendMessageAsync(SessionMessage message, CancellationToken cancellationToken)
     {
         try
         {
@@ -55,7 +55,7 @@ public class SessionStore : ISessionStore
         }
     }
 
-    public async Task<IReadOnlyList<SessionMessage>> LoadMessagesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SessionMessage>> LoadMessagesAsync(CancellationToken cancellationToken)
     {
         if (!File.Exists(CurrentFilePath))
         {
@@ -87,6 +87,7 @@ public class SessionStore : ISessionStore
                 try
                 {
                     SessionMessage? message = JsonSerializer.Deserialize<SessionMessage>(line, SerializerOptions);
+
                     if (message is not null)
                     {
                         messages.Add(message);

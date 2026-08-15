@@ -8,5 +8,5 @@ public interface IChatClient
     IAsyncEnumerable<StreamingChatUpdate> StreamChatAsync(
         IReadOnlyList<SessionMessage> messages,
         IReadOnlyList<ITool> tools,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken);
 }
