@@ -32,16 +32,20 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
                 Error: "Failed to inspect milestone: 'id' parameter is required. Usage: {\"id\": \"<milestone_id>\"}"));
         }
 
-        IReadOnlyList<BranchNode> branchNodes = [.. session.History.OfType<BranchNode>()];
+        BranchNode? matchedBranch = null;
 
-        BranchNode? matchedBranch = branchNodes.FirstOrDefault(b => b.Id.Equals(targetId, StringComparison.OrdinalIgnoreCase))
-            ?? branchNodes.FirstOrDefault(b => b.Id.StartsWith(targetId, StringComparison.OrdinalIgnoreCase));
+        foreach (HistoryNode node in session.History)
+        {
+            if (node is BranchNode branchNode && branchNode.Id == targetId)
+            {
+                matchedBranch = branchNode;
+            }
+        }
 
         if (matchedBranch is null)
         {
-            string availableIds = branchNodes.Count > 0
-                ? string.Join(", ", branchNodes.Select(b => b.Id))
-                : "None";
+            string availableIds = session.History.Count > 0 ?
+                string.Join(", ", session.History.Select(branch => branch.Id)) : "None";
 
             return Task.FromResult(new ToolExecutionResult(
                 Success: false,
