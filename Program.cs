@@ -35,7 +35,7 @@ public class Program
         EventBroker eventBroker = new();
         await using TerminalUI terminalUI = new(eventBroker, cancellationTokenSource.Token);
 
-        SessionStore sessionStore = new(settings.SessionsDirectory);
+        await using SessionStore sessionStore = new(settings.SessionsDirectory);
         ToolManager toolManager = new(eventBroker);
 
         eventBroker.Publish(new StartupStartedEvent());
@@ -45,7 +45,7 @@ public class Program
         {
             foreach (Exception error in toolManager.Errors)
             {
-                Console.Error.WriteLine($"Tool initialization failed: {error.Message}");
+                Console.Error.WriteLine($"Tool initialisation failed: {error.Message}");
             }
 
             Environment.ExitCode = 1;

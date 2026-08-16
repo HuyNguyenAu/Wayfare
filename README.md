@@ -1,12 +1,12 @@
-# WAYFARE // SOLAR PUNK SANCTUARY v1.0
+# WAYFARE // SOLAR BIOSPHERE v3.5
 
-> High-performance .NET 10 terminal-based AI coding assistant harness powered by an Abstract Syntax Tree (AST) Context model, dynamic Roslyn tool engine, and event-driven ReAct execution loop.
+> High-performance .NET 10 terminal-based AI coding assistant harness powered by Chlorophyll OS & VerdantAgent, an Abstract Syntax Tree (AST) Context model, dynamic Roslyn tool engine, and event-driven ReAct execution loop.
 
 ---
 
 ## Architecture Overview
 
-`Wayfare` organizes conversation history into a structured **AST Context** model. Instead of feeding flat unorganized message logs to the LLM, `Wayfare` structures interaction history into explicit branches and discrete turn nodes.
+`Wayfare` organises conversation history into a structured **AST Context** model. Instead of feeding flat unorganised message logs to the LLM, `Wayfare` structures interaction history into explicit branches and discrete turn nodes.
 
 ```mermaid
 graph TD
@@ -21,12 +21,12 @@ graph TD
 ### Key Architectural Pillars
 
 1. **Pure Domain AST Entities (`Core/Models/Ast/`):**
-   - [`HistoryNode`](Core/Models/Ast/HistoryNode.cs): Abstract base record with polymorphic JSON serialization attributes (`[JsonPolymorphic]`, `[JsonDerivedType]`).
+   - [`HistoryNode`](Core/Models/Ast/HistoryNode.cs): Abstract base record with polymorphic JSON serialisation attributes (`[JsonPolymorphic]`, `[JsonDerivedType]`).
    - [`BranchNode`](Core/Models/Ast/BranchNode.cs): Active working branch representing live tool execution turns and squashed milestone summaries.
    - [`TurnNode`](Core/Models/Ast/TurnNode.cs): Leaf node wrapping discrete domain messages (`UserMessage`, `AssistantMessage`, `ToolCallMessage`, `ToolResultMessage`).
 
 2. **Branch Squashing (`Core/Orchestrator.cs` & `Core/Prompts/SquashPromptBuilder.cs`):**
-   - Summarizes completed active branches into STARL format (Situation, Task, Action, Result, Learnings) checkpoints to prevent prompt token bloat while keeping linear milestones intact.
+   - Summarises completed active branches into STARL format (Situation, Task, Action, Result, Learnings) checkpoints to prevent prompt token bloat while keeping linear milestones intact.
 
 3. **Dynamic Roslyn Tool Engine (`Tools/ToolManager.cs`):**
    - Compiles tool implementations (`Tools/Implementations/*.cs`) at runtime using Roslyn.
@@ -57,10 +57,11 @@ Wayfare/
 │   └── SessionStore.cs           # AST JSON persistence
 ├── Tools/
 │   ├── Implementations/          # Dynamic tools (read, write, replace, list, find, exec)
-│   ├── ToolHelpers.cs            # Argument deserialization & path validation helpers
+│   ├── ToolHelpers.cs            # Argument deserialisation & path validation helpers
 │   └── ToolManager.cs            # Roslyn dynamic compiler & loader
 ├── UI/
 │   ├── Components/               # ProgressRenderer & MarkdownStreamRenderer
+│   ├── ColourPalette.cs          # Solarpunk truecolour palette & circadian theme tokens
 │   └── TerminalUI.cs             # Event-driven Spectre.Console UI
 ├── Program.cs                    # Application entry point
 ├── Wayfare.csproj                # Main C# project configuration

@@ -11,7 +11,7 @@ public static class SystemPromptBuilder
 
         StringBuilder promptBuilder = new();
 
-        promptBuilder.AppendLine("You are a coding agent harness. You help users by reading and editing files.");
+        promptBuilder.AppendLine("You assist human co-creators by nurturing codebases as living ecosystems—reading, editing, and cultivating sustainable code health.");
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("Available tools:");
 
@@ -28,7 +28,7 @@ public static class SystemPromptBuilder
         promptBuilder.AppendLine("- The oldText in replace must appear exactly once in the file. If it appears more than once, add more surrounding lines to make it unique.");
         promptBuilder.AppendLine("- To create a new file or completely overwrite one, use write.");
         promptBuilder.AppendLine("- Always read a file before editing it.");
-        promptBuilder.AppendLine("- Keep responses short. Show file paths when working with files.");
+        promptBuilder.AppendLine("- Keep responses short and focused. Show exact file paths when working with files.");
         promptBuilder.AppendLine();
         promptBuilder.AppendLine($"Current date: {DateTime.UtcNow:yyyy-MM-dd HH:mm UTC}");
         promptBuilder.AppendLine($"Current operating system: {Environment.OSVersion}");

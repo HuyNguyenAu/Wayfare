@@ -8,10 +8,9 @@ public static class SquashPromptBuilder
     {
         StringBuilder promptBuilder = new();
 
-        promptBuilder.AppendLine("You are a concise technical summarizer. Extract the key milestone data from the provided execution trace.");
+        promptBuilder.AppendLine("You are a concise technical summariser. Extract the key milestone data from the provided execution trace.");
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("Follow the STARL format (Situation, Task, Action, Result, Learnings) exactly.");
-
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("Rules:");
         promptBuilder.AppendLine("- Be strictly factual and concise. No conversational filler, intros, or outros.");

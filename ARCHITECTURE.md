@@ -136,7 +136,7 @@ if (toolManager.Errors.Count > 0)
 {
     foreach (Exception error in toolManager.Errors)
     {
-        Console.Error.WriteLine($"Tool initialization failed: {error.Message}");
+        Console.Error.WriteLine($"Tool initialisation failed: {error.Message}");
     }
     Environment.ExitCode = 1;
     return;

@@ -11,7 +11,7 @@ using Wayfare.Core.Exceptions;
 
 namespace Wayfare.Tools;
 
-public sealed class ToolManager(IEventPublisher eventPublisher) : IToolManager
+public class ToolManager(IEventPublisher eventPublisher) : IToolManager
 {
     private readonly string[] _ignoreFiles = ["ITool.cs", "ToolHelpers.cs"];
 

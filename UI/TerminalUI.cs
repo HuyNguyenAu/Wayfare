@@ -49,11 +49,11 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
             _hasPrompted = true;
         }
 
-        string promptMarkup = $"[{Palette.HexLightPeach}]wayfarer[/][{Palette.HexOrange}] ❯[/] ";
+        string promptMarkup = $"[{ColourPalette.HexTerracottaSol}]⁖ verdant[/][{ColourPalette.HexSunlitOchre}] ❯[/] ";
 
         return await AnsiConsole.PromptAsync(
             new TextPrompt<string>(promptMarkup)
-                .PromptStyle(new Style(foreground: Palette.White))
+                .PromptStyle(new Style(foreground: ColourPalette.MyceliumLinen))
                 .AllowEmpty(),
             cancellationToken
         );
@@ -86,7 +86,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[{Palette.HexRed}]UI Event Processing Error: {Markup.Escape(ex.Message)}[/]");
+            AnsiConsole.MarkupLine($"[{ColourPalette.HexClayEmber}]⚠ UI Event Processing Error: {Markup.Escape(ex.Message)}[/]");
         }
         finally
         {

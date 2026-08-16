@@ -19,7 +19,7 @@ public class MarkdownStreamRenderer
         _markdownPipe = new Pipe();
         _markdownTask = Task.Run(() => AnsiConsole.Console.WriteMarkdownAsync(
             _markdownPipe.Reader.AsStream(),
-            Palette.CreateMarkdownStyles(),
+            ColourPalette.CreateMarkdownStyles(),
             Encoding.UTF8,
             cancellationToken
         ), cancellationToken);
@@ -29,7 +29,7 @@ public class MarkdownStreamRenderer
     {
         if (_isFirstChunk)
         {
-            AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
+            AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ ]")}[/]");
             _isFirstChunk = false;
         }
 
@@ -45,7 +45,7 @@ public class MarkdownStreamRenderer
     {
         if (_isFirstChunk)
         {
-            AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen}][bold][[OK]][/][/]");
+            AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ ]")}[/]");
             _isFirstChunk = false;
         }
 

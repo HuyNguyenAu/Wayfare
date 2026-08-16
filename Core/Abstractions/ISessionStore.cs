@@ -1,6 +1,6 @@
 namespace Wayfare.Core.Abstractions;
 
-public interface ISessionStore
+public interface ISessionStore : IAsyncDisposable
 {
     ISession Session { get; }
 

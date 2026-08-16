@@ -2,20 +2,24 @@ using Spectre.Console;
 
 namespace Wayfare.UI.Components;
 
+/// <summary>
+/// Renders terminal progress, headers, and status cards adhering to Chlorophyll OS &amp; VerdantAgent v3.5 (DESIGN.md).
+/// </summary>
 public static class ProgressRenderer
 {
     public static void RenderStartupStarted()
     {
-        AnsiConsole.MarkupLine($"[{Palette.HexOrange} bold]WAYFARE // SOLAR BIOSPHERE v1.0[/]");
-        AnsiConsole.MarkupLine($"[{Palette.HexDarkGreen}]PHOTOVOLTAIC ARRAY: OPTIMAL // ECOLOGICAL MESH: ONLINE[/]{Environment.NewLine}");
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[CANOPY]][/] {Markup.Escape("Calibrating micro-climate sensors...")}");
-        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen} bold][[SYNCHRONISED]][/]");
+        string theme = ColourPalette.GetCircadianThemeName();
+        AnsiConsole.MarkupLine($"[{ColourPalette.HexTerracottaSol} bold]☼ WAYFARE // CHLOROPHYLL OS v3.5[/] [{ColourPalette.HexSporeDust}]({theme})[/]");
+        AnsiConsole.MarkupLine($"[{ColourPalette.HexLivingCanopy}]☵ PHOTOVOLTAIC ARRAY: OPTIMAL  •  ⇋ LOCAL MESH: ONLINE[/]{Environment.NewLine}");
+        AnsiConsole.Markup($"[{ColourPalette.HexBiolumAzure}]☵ {Markup.Escape("[CANOPY]")}[/] {Markup.Escape("Calibrating micro-climate sensors...")}");
+        AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ SYNCHRONISED ]")}[/]");
     }
 
     public static void RenderStartupCompleted()
     {
-        AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[CANOPY]][/] {Markup.Escape("Interfacing with community mesh network...")} [{Palette.HexDarkGreen} bold][[SYNCHRONISED]][/]");
-        AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[CANOPY]][/] {Markup.Escape("Establishing regenerative workspace...")} [{Palette.HexDarkGreen} bold][[SYNCHRONISED]][/]");
+        AnsiConsole.MarkupLine($"[{ColourPalette.HexBiolumAzure}]☵ {Markup.Escape("[CANOPY]")}[/] {Markup.Escape("Interfacing with community mesh network...")} [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ SYNCHRONISED ]")}[/]");
+        AnsiConsole.MarkupLine($"[{ColourPalette.HexBiolumAzure}]☵ {Markup.Escape("[CANOPY]")}[/] {Markup.Escape("Establishing regenerative workspace...")} [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ SYNCHRONISED ]")}[/]");
     }
 
     public static void RenderStartAgent()
@@ -26,49 +30,49 @@ public static class ProgressRenderer
         grid.AddColumn();
         grid.AddColumn(new GridColumn().RightAligned());
         grid.AddRow(
-            new Markup($"[{Palette.HexOrange} bold]◈ WAYFARE // BIOSPHERE COMPANION v1.0[/]"),
-            new Markup($"[{Palette.HexDarkGreen} bold][[SOLAR RESERVE 100% // BALANCED]][/]")
+            new Markup($"[{ColourPalette.HexTerracottaSol} bold]☵ WAYFARE // VERDANT AGENT v3.5[/]"),
+            new Markup($"[{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ☼ SOLAR RESERVE 100% // BALANCED ]")}[/]")
         );
 
         AnsiConsole.Write(grid);
-        AnsiConsole.Write(new Rule().RuleStyle(new Style(foreground: Palette.DarkGreen)));
+        AnsiConsole.Write(new Rule().RuleStyle(new Style(foreground: ColourPalette.LivingCanopy)));
     }
 
     public static void RenderLoadingToolsStarted()
     {
-        AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[CANOPY]][/] Cultivating toolchain modules...");
+        AnsiConsole.MarkupLine($"[{ColourPalette.HexBiolumAzure}]⌕ {Markup.Escape("[SEEDLINGS]")}[/] Cultivating toolchain modules...");
     }
 
     public static void RenderToolCompilationStarted(string toolName)
     {
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[CANOPY]][/] {Markup.Escape($"Compiling {toolName} interface...")}");
+        AnsiConsole.Markup($"[{ColourPalette.HexBiolumAzure}]⑂ {Markup.Escape("[GRAFTING]")}[/] {Markup.Escape($"Compiling {toolName} interface...")}");
     }
 
     public static void RenderToolCompilationCompleted()
     {
-        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen} bold][[SYNCHRONISED]][/]");
+        AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ SYNCHRONISED ]")}[/]");
     }
 
     public static void RenderToolCompilationFailed(string toolName, string error)
     {
-        AnsiConsole.MarkupLine($" [{Palette.HexRed} bold][[DEGRADED]][/]");
-        AnsiConsole.MarkupLine($"[{Palette.HexRed}]Fault synthesizing {toolName}: {error}[/]");
+        AnsiConsole.MarkupLine($" [{ColourPalette.HexClayEmber} bold]{Markup.Escape("[ ⌁ DEGRADED ]")}[/]");
+        AnsiConsole.MarkupLine($"[{ColourPalette.HexClayEmber}]⚠ Fault synthesising {Markup.Escape(toolName)}: {Markup.Escape(error)}[/]");
     }
 
     public static void RenderToolLoadingStarted(string toolName)
     {
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[CANOPY]][/] {Markup.Escape($"Grafting module {toolName} into mesh...")}");
+        AnsiConsole.Markup($"[{ColourPalette.HexBiolumAzure}]⑂ {Markup.Escape("[GRAFTING]")}[/] {Markup.Escape($"Grafting module {toolName} into mesh...")}");
     }
 
     public static void RenderToolLoadingCompleted()
     {
-        AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen} bold][[SYNCHRONISED]][/]");
+        AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ SYNCHRONISED ]")}[/]");
     }
 
     public static void RenderToolLoadingFailed(string toolName, string error)
     {
-        AnsiConsole.MarkupLine($" [{Palette.HexRed} bold][[DEGRADED]][/]");
-        AnsiConsole.MarkupLine($"[{Palette.HexRed}]Grafting failed for {toolName}: {error}[/]");
+        AnsiConsole.MarkupLine($" [{ColourPalette.HexClayEmber} bold]{Markup.Escape("[ ⌁ DEGRADED ]")}[/]");
+        AnsiConsole.MarkupLine($"[{ColourPalette.HexClayEmber}]⚠ Grafting failed for {Markup.Escape(toolName)}: {Markup.Escape(error)}[/]");
     }
 
     public static void RenderChatRequestStarted(IReadOnlyList<string> toolNames)
@@ -77,32 +81,32 @@ public static class ProgressRenderer
             ? $"Synthesising signals across [{string.Join(", ", toolNames)}]..."
             : "Channeling cognitive currents...";
 
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[CANOPY]][/] {Markup.Escape(statusDescription)}");
+        AnsiConsole.Markup($"[{ColourPalette.HexBiolumAzure}]⁖ {Markup.Escape("[DELIBERATING]")}[/] {Markup.Escape(statusDescription)}");
     }
 
     public static void RenderToolExecutionStarted(string invocationMessage)
     {
-        AnsiConsole.Markup($"[{Palette.HexBlue}][[CANOPY]][/] Activating {Markup.Escape(invocationMessage)}");
+        AnsiConsole.Markup($"[{ColourPalette.HexBiolumAzure}]⑂ {Markup.Escape("[ACTIVATING]")}[/] {Markup.Escape(invocationMessage)}");
     }
 
     public static void RenderToolExecutionCompleted(bool success, string displayMessage)
     {
         if (success)
         {
-            AnsiConsole.MarkupLine($" [{Palette.HexDarkGreen} bold][[SYNCHRONISED]][/]");
-            AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[CANOPY]][/] [{Palette.HexWhite}]{Markup.Escape(displayMessage)}[/]");
+            AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ SYNCHRONISED ]")}[/]");
+            AnsiConsole.MarkupLine($"[{ColourPalette.HexAlgaeLumens}]❦ {Markup.Escape("[OBSERVATION]")}[/] [{ColourPalette.HexMyceliumLinen}]{Markup.Escape(displayMessage)}[/]");
         }
         else
         {
-            AnsiConsole.MarkupLine($" [{Palette.HexRed} bold][[DEGRADED]][/]");
-            AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[CANOPY]][/] [{Palette.HexRed}]{Markup.Escape(displayMessage)}[/]");
+            AnsiConsole.MarkupLine($" [{ColourPalette.HexClayEmber} bold]{Markup.Escape("[ ⌁ DEGRADED ]")}[/]");
+            AnsiConsole.MarkupLine($"[{ColourPalette.HexClayEmber}]⌁ {Markup.Escape("[DEGRADED]")}[/] [{ColourPalette.HexClayEmber}]⚠ {Markup.Escape(displayMessage)}[/]");
         }
     }
 
     public static void RenderSquashingBranch()
     {
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[{Palette.HexBlue}][[CANOPY]][/] {Markup.Escape("Compressing epoch turns into root milestone...")}");
+        AnsiConsole.MarkupLine($"[{ColourPalette.HexBiolumAzure}]✁ {Markup.Escape("[PRUNING]")}[/] {Markup.Escape("Compressing epoch turns into root milestone...")}");
     }
 
     public static void RenderObjectiveAndMilestones(string objective, IReadOnlyList<string> milestones)
@@ -111,12 +115,12 @@ public static class ProgressRenderer
 
         Grid grid = new();
         grid.AddColumn();
-        grid.AddRow(new Markup($"[{Palette.HexOrange} bold]// BIOSPHERE DIRECTIVE:[/] [{Palette.HexWhite}]{Markup.Escape(objective)}[/]"));
-        grid.AddRow(new Markup($"[{Palette.HexBlue} bold]// HARVESTED MILESTONES [[{milestones.Count} CYCLES]]:[/]"));
+        grid.AddRow(new Markup($"[{ColourPalette.HexTerracottaSol} bold]⑂ BIOSPHERE DIRECTIVE:[/] [{ColourPalette.HexMyceliumLinen}]{Markup.Escape(objective)}[/]"));
+        grid.AddRow(new Markup($"[{ColourPalette.HexBiolumAzure} bold]{Markup.Escape($"❦ HARVESTED MILESTONES [{milestones.Count} CYCLES]:")}[/]"));
 
         for (int i = 0; i < milestones.Count; i++)
         {
-            grid.AddRow(new Markup($"  [{Palette.HexDarkGreen}]◈[/] [{Palette.HexLightPeach}]NODE-{i + 1:D2}[/] [{Palette.HexLightGray}]{Markup.Escape(milestones[i].Trim())}[/]"));
+            grid.AddRow(new Markup($"  [{ColourPalette.HexAlgaeLumens}]❦[/] [{ColourPalette.HexTerracottaSol}]NODE-{i + 1:D2}[/] [{ColourPalette.HexSporeDust}]{Markup.Escape(milestones[i].Trim())}[/]"));
         }
 
         AnsiConsole.Write(grid);
