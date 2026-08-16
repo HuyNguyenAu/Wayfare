@@ -50,7 +50,7 @@ public class MessagePromptBuilder : IMessagePromptBuilder
             trunk.AppendLine($"{i + 1}. [{branch.Id}]: {branch.Summary}");
         }
 
-        trunk.AppendLine("\nNote: Past turns are squashed into milestones. Call inspect_milestones(id) to view more details.");
+        trunk.AppendLine("\nNote: Past turns are squashed into milestones. Call inspect_milestone(id) to view all previous turns of that milestone.");
 
         return trunk.ToString();
     }

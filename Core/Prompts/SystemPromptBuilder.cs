@@ -27,6 +27,7 @@ public static class SystemPromptBuilder
         promptBuilder.AppendLine("- To edit a file, use replace. The oldText must match exactly what is in the file, including whitespace.");
         promptBuilder.AppendLine("- The oldText in replace must appear exactly once in the file. If it appears more than once, add more surrounding lines to make it unique.");
         promptBuilder.AppendLine("- To create a new file or completely overwrite one, use write.");
+        promptBuilder.AppendLine("- To view all turns of a past milestone, use inspect_milestone with its id.");
         promptBuilder.AppendLine("- Always read a file before editing it.");
         promptBuilder.AppendLine("- Keep responses short and focused. Show exact file paths when working with files.");
         promptBuilder.AppendLine();

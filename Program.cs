@@ -36,7 +36,8 @@ public class Program
         await using TerminalUI terminalUI = new(eventBroker, cancellationTokenSource.Token);
 
         await using SessionStore sessionStore = new(settings.SessionsDirectory);
-        ToolManager toolManager = new(eventBroker);
+        InspectMilestoneTool inspectMilestoneTool = new(sessionStore.Session);
+        ToolManager toolManager = new(eventBroker, [inspectMilestoneTool]);
 
         eventBroker.Publish(new StartupStartedEvent());
         await toolManager.LoadToolsAsync(settings.ToolsPath, "*.cs", settings.CompiledDirectory, cancellationTokenSource.Token);

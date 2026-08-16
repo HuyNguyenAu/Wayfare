@@ -11,9 +11,9 @@ using Wayfare.Core.Exceptions;
 
 namespace Wayfare.Tools;
 
-public class ToolManager(IEventPublisher eventPublisher) : IToolManager
+public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> builtInTools) : IToolManager
 {
-    private readonly string[] _ignoreFiles = ["ITool.cs", "ToolHelpers.cs"];
+    private readonly string[] _ignoreFiles = ["ITool.cs", "ToolHelpers.cs", "InspectMilestoneTool.cs"];
 
     public IReadOnlyList<ITool> Tools { get; private set; } = [];
     public IReadOnlyList<Exception> Errors { get; private set; } = [];
@@ -22,7 +22,7 @@ public class ToolManager(IEventPublisher eventPublisher) : IToolManager
     {
         LoadToolsResult loadToolsResult = await LoadToolsFromDirectoryAsync(directoryPath, searchPattern, compiledDirectoryPath, cancellationToken);
 
-        Tools = loadToolsResult.Tools;
+        Tools = [.. builtInTools, .. loadToolsResult.Tools];
         Errors = loadToolsResult.Errors;
     }
 
