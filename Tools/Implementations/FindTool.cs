@@ -11,13 +11,9 @@ internal sealed class FindTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out FindArguments? findArguments, out string? findArgumentsError))
-        {
-            throw new ArgumentException($"Failed to deserialise arguments for {Name} tool. Error: {findArgumentsError}. Arguments: {arguments}");
-        }
-
-        string searchPath = string.IsNullOrWhiteSpace(findArguments.Path) ? "." : findArguments.Path;
-        return $"[{DisplayName}] [{searchPath}] [{findArguments.Pattern}]";
+        return toolHelpers.TryDeserializeArguments(arguments, out FindArguments? args, out _)
+            ? $"[{DisplayName}] [{(string.IsNullOrWhiteSpace(args.Path) ? "." : args.Path)}] [{args.Pattern}]"
+            : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
@@ -72,5 +68,5 @@ internal sealed class FindTool(IToolHelpers toolHelpers) : ITool
         }
     }
 
-    internal record FindArguments(string? Path, string Pattern);
+    internal record FindArguments(string Path = ".", string Pattern = "");
 }

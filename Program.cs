@@ -1,14 +1,14 @@
 using System.ClientModel;
 using Wayfare.Core;
 using Wayfare.Core.Events;
-using Wayfare.Core.Models;
-using Wayfare.Core.Prompts;
 using Wayfare.Infrastructure.Clients;
 using Wayfare.Infrastructure.Configuration;
 using Wayfare.Infrastructure.Events;
 using Wayfare.Persistence;
 using Wayfare.Tools;
 using Wayfare.UI;
+
+using Wayfare.Core.Prompts;
 
 namespace Wayfare;
 
@@ -34,19 +34,30 @@ public class Program
 
         EventBroker eventBroker = new();
         await using TerminalUI terminalUI = new(eventBroker, cancellationTokenSource.Token);
-        ToolManager toolManager = new(eventBroker);
+
         SessionStore sessionStore = new(settings.SessionsDirectory);
+        ToolManager toolManager = new(eventBroker);
 
         eventBroker.Publish(new StartupStartedEvent());
         await toolManager.LoadToolsAsync(settings.ToolsPath, "*.cs", settings.CompiledDirectory, cancellationTokenSource.Token);
+
+        if (toolManager.Errors.Count > 0)
+        {
+            foreach (Exception error in toolManager.Errors)
+            {
+                Console.Error.WriteLine($"Tool initialization failed: {error.Message}");
+            }
+
+            Environment.ExitCode = 1;
+            return;
+        }
+
         eventBroker.Publish(new StartupCompletedEvent());
         eventBroker.Publish(new AgentStartedEvent());
 
-        string systemPrompt = SystemPromptBuilder.Build(toolManager.Tools);
-        Session session = new(systemPrompt);
-        await sessionStore.AppendMessageAsync(session.Messages[0], cancellationTokenSource.Token);
-
-        Orchestrator orchestrator = new(session, openAIClient, toolManager, sessionStore, eventBroker);
+        BranchSquasher branchSquasher = new(openAIClient);
+        MessagePromptBuilder messagePromptBuilder = new();
+        Orchestrator orchestrator = new(openAIClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder);
 
         try
         {

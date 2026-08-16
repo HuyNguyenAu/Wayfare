@@ -9,4 +9,8 @@ public interface IChatClient
         IReadOnlyList<SessionMessage> messages,
         IReadOnlyList<ITool> tools,
         CancellationToken cancellationToken);
+    Task<ChatCompletionResult> CompleteChatAsync(
+        IReadOnlyList<SessionMessage> messages,
+        IReadOnlyList<ITool> tools,
+        CancellationToken cancellationToken);
 }

@@ -64,9 +64,10 @@ public sealed class ToolManager(IEventPublisher eventPublisher) : IToolManager
             throw new LoadToolException($"Failed to access tool directory '{directoryPath}' with search pattern '{searchPattern}'", ex);
         }
 
-        HashSet<string?> activeToolNames = toolFilePaths
+        HashSet<string> activeToolNames = toolFilePaths
             .Select(Path.GetFileNameWithoutExtension)
-            .Where(name => name is not null && !_ignoreFiles.Contains($"{name}.cs"))
+            .Where(name => !string.IsNullOrEmpty(name) && !_ignoreFiles.Contains($"{name}.cs"))
+            .Select(name => name!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Delete stale DLL files for tools that no longer exist.
@@ -82,9 +83,9 @@ public sealed class ToolManager(IEventPublisher eventPublisher) : IToolManager
                     {
                         File.Delete(dllFilePath);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Ignore deletion errors (e.g. file locked).
+                        throw new LoadToolException($"Failed to delete stale compiled tool '{dllFilePath}' for tool '{toolName}'", ex);
                     }
                 }
             }
@@ -116,16 +117,16 @@ public sealed class ToolManager(IEventPublisher eventPublisher) : IToolManager
 
                     eventPublisher.Publish(new ToolCompilationFailedEvent(toolName, ex.Message));
 
-                    try
+                    if (File.Exists(dllPath))
                     {
-                        if (File.Exists(dllPath))
+                        try
                         {
                             File.Delete(dllPath);
                         }
-                    }
-                    catch
-                    {
-                        // Ignore.
+                        catch
+                        {
+                            // Best-effort cleanup after compilation failure
+                        }
                     }
                 }
             }
@@ -167,8 +168,11 @@ public sealed class ToolManager(IEventPublisher eventPublisher) : IToolManager
             "using System.Collections.Generic;",
             "using System.Threading;",
             "using System.Threading.Tasks;",
+            "using System.Text.Json;",
+            "using System.Text.Json.Serialization;",
             "using Wayfare.Core.Abstractions;",
             "using Wayfare.Core.Models;",
+            "using Wayfare.Core.Models.Ast;",
             "using Wayfare.Tools;",
         ];
         string sourceWithUsings = $"{string.Join(Environment.NewLine, usings)}{Environment.NewLine}{sourceCode}";
@@ -184,6 +188,8 @@ public sealed class ToolManager(IEventPublisher eventPublisher) : IToolManager
             typeof(ITool).Assembly.Location,
             typeof(ToolHelpers).Assembly.Location,
             typeof(Wayfare.Core.Models.ToolExecutionResult).Assembly.Location,
+            typeof(System.Text.Json.JsonSerializer).Assembly.Location,
+            typeof(System.Text.Json.Serialization.JsonPropertyNameAttribute).Assembly.Location,
             typeof(Process).Assembly.Location,
             typeof(Console).Assembly.Location,
             typeof(Task).Assembly.Location,

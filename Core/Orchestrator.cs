@@ -12,110 +12,164 @@ public interface IOrchestrator
 }
 
 public class Orchestrator(
-    ISession session,
     IChatClient chatClient,
     IToolManager toolManager,
     ISessionStore sessionStore,
-    IEventPublisher eventPublisher) : IOrchestrator
+    IEventPublisher eventPublisher,
+    IBranchSquasher branchSquasher,
+    IMessagePromptBuilder messagePromptBuilder) : IOrchestrator
 {
+    private readonly ISession _session = sessionStore.Session;
+
     public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
     {
-        session.BeginThinking(userInput);
-        await sessionStore.AppendMessageAsync(session.Messages[^1], cancellationToken);
-        eventPublisher.Publish(new SessionUpdatedEvent());
+        ArgumentException.ThrowIfNullOrWhiteSpace(userInput);
 
-        while (session.State != SessionState.Done && !cancellationToken.IsCancellationRequested)
+        await InitialiseCycleAsync(userInput, cancellationToken);
+
+        while (_session.State != SessionState.Done && !cancellationToken.IsCancellationRequested)
         {
-            IReadOnlyList<string> toolNames = [];
+            ThinkingPhaseResult thinkingResult = await ExecuteThinkingPhaseAsync(cancellationToken);
 
-            if (session.Messages[^1] is ToolResultMessage toolResultMessage)
+            if (thinkingResult.HasToolCalls)
             {
-                List<string> names = new(toolResultMessage.Results.Count);
-
-                for (int i = 0; i < toolResultMessage.Results.Count; i++)
-                {
-                    names.Add(toolResultMessage.Results[i].ToolName);
-                }
-
-                toolNames = names;
+                IReadOnlyList<ToolExecutionResult> toolResults = await ExecuteActingPhaseAsync(thinkingResult.ToolCalls, cancellationToken);
+                await ExecuteObservingPhaseAsync(toolResults, cancellationToken);
             }
-
-            eventPublisher.Publish(new ChatRequestStartedEvent(toolNames));
-
-            StringBuilder assembledContent = new();
-            Dictionary<int, ToolCallBuilder> toolCallBuilders = [];
-            AgentFinishReason? finishReason = null;
-
-            await foreach (StreamingChatUpdate update in chatClient.StreamChatAsync(session.Messages, toolManager.Tools, cancellationToken))
+            else if (thinkingResult.IsCompleted)
             {
-                if (update.ContentUpdate is not null)
-                {
-                    assembledContent.Append(update.ContentUpdate);
-                    eventPublisher.Publish(new TokenChunkReceivedEvent(update.ContentUpdate));
-                }
-
-                if (update.ToolCallUpdate is not null)
-                {
-                    StreamingToolCallChunk toolCallUpdate = update.ToolCallUpdate;
-
-                    if (!toolCallBuilders.TryGetValue(toolCallUpdate.Index, out ToolCallBuilder? builder))
-                    {
-                        builder = new ToolCallBuilder();
-                        toolCallBuilders[toolCallUpdate.Index] = builder;
-                    }
-
-                    if (!string.IsNullOrEmpty(toolCallUpdate.ToolId))
-                    {
-                        builder.ToolId.Append(toolCallUpdate.ToolId);
-                    }
-
-                    if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
-                    {
-                        builder.Name.Append(toolCallUpdate.FunctionName);
-                    }
-
-                    if (!string.IsNullOrEmpty(toolCallUpdate.FunctionArgumentsUpdate))
-                    {
-                        builder.Args.Append(toolCallUpdate.FunctionArgumentsUpdate);
-                    }
-                }
-
-                if (update.FinishReason is not null)
-                {
-                    finishReason = update.FinishReason;
-                }
-            }
-
-            eventPublisher.Publish(new ChatRequestCompletedEvent());
-            session.RecordThought(assembledContent.ToString());
-            await sessionStore.AppendMessageAsync(session.Messages[^1], cancellationToken);
-            eventPublisher.Publish(new SessionUpdatedEvent());
-
-            IReadOnlyList<ToolCall> toolCalls = [.. toolCallBuilders.Values.Select(builder => new ToolCall(builder.ToolId.ToString(), builder.Name.ToString(), builder.Args.ToString()))];
-
-            if (toolCalls.Count > 0)
-            {
-                session.RequestAction(toolCalls);
-                await sessionStore.AppendMessageAsync(session.Messages[^1], cancellationToken);
-                eventPublisher.Publish(new SessionUpdatedEvent());
-
-                IReadOnlyList<Task<ToolExecutionResult>> executionTasks = [.. toolCalls.Select(tc => ExecuteToolAsync(tc, cancellationToken))];
-                IReadOnlyList<ToolExecutionResult> toolResults = await Task.WhenAll(executionTasks);
-
-                session.RecordObservation(toolResults);
-                await sessionStore.AppendMessageAsync(session.Messages[^1], cancellationToken);
-                session.ResumeThinking();
-                eventPublisher.Publish(new SessionUpdatedEvent());
-            }
-            else if (finishReason == AgentFinishReason.Stop || finishReason == AgentFinishReason.Length)
-            {
-                session.Finish();
-                eventPublisher.Publish(new SessionUpdatedEvent());
+                await CompleteCycleAsync(cancellationToken);
             }
         }
 
-        session.Idle();
-        eventPublisher.Publish(new SessionUpdatedEvent());
+        await FinaliseCycleAsync(cancellationToken);
+    }
+
+    private async Task InitialiseCycleAsync(string userInput, CancellationToken cancellationToken)
+    {
+        _session.StartBranch();
+        _session.TransitionTo(SessionState.Thinking);
+
+        UserMessage userMessage = new(userInput);
+        _session.AppendTurn(userMessage);
+        await sessionStore.SaveAsync(cancellationToken);
+    }
+
+    private async Task<ThinkingPhaseResult> ExecuteThinkingPhaseAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> toolNames = GetPreviousToolNames();
+        eventPublisher.Publish(new ChatRequestStartedEvent(toolNames));
+
+        StringBuilder assembledContent = new();
+        Dictionary<int, ToolCallBuilder> toolCallBuilders = [];
+        AgentFinishReason? finishReason = null;
+
+        IReadOnlyList<SessionMessage> messages = messagePromptBuilder.BuildMessages(toolManager.Tools, _session.History);
+
+        await foreach (StreamingChatUpdate update in chatClient.StreamChatAsync(messages, toolManager.Tools, cancellationToken))
+        {
+            if (update.ContentUpdate is not null)
+            {
+                assembledContent.Append(update.ContentUpdate);
+                eventPublisher.Publish(new TokenChunkReceivedEvent(update.ContentUpdate));
+            }
+
+            if (update.ToolCallUpdate is not null)
+            {
+                StreamingToolCallChunk toolCallUpdate = update.ToolCallUpdate;
+
+                if (!toolCallBuilders.TryGetValue(toolCallUpdate.Index, out ToolCallBuilder? builder))
+                {
+                    builder = new ToolCallBuilder();
+                    toolCallBuilders[toolCallUpdate.Index] = builder;
+                }
+
+                if (!string.IsNullOrEmpty(toolCallUpdate.ToolId))
+                {
+                    builder.ToolId.Append(toolCallUpdate.ToolId);
+                }
+
+                if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
+                {
+                    builder.Name.Append(toolCallUpdate.FunctionName);
+                }
+
+                if (!string.IsNullOrEmpty(toolCallUpdate.FunctionArgumentsUpdate))
+                {
+                    builder.Args.Append(toolCallUpdate.FunctionArgumentsUpdate);
+                }
+            }
+
+            if (update.FinishReason is not null)
+            {
+                finishReason = update.FinishReason;
+            }
+        }
+
+        eventPublisher.Publish(new ChatRequestCompletedEvent());
+
+        AssistantMessage assistantMessage = new(assembledContent.ToString());
+        _session.AppendTurn(assistantMessage);
+        await sessionStore.SaveAsync(cancellationToken);
+
+        IReadOnlyList<ToolCall> toolCalls = [.. toolCallBuilders.Values.Select(builder => new ToolCall(builder.ToolId.ToString(), builder.Name.ToString(), builder.Args.ToString()))];
+
+        return new ThinkingPhaseResult(toolCalls, finishReason);
+    }
+
+    private async Task<IReadOnlyList<ToolExecutionResult>> ExecuteActingPhaseAsync(IReadOnlyList<ToolCall> toolCalls, CancellationToken cancellationToken)
+    {
+        _session.TransitionTo(SessionState.Acting);
+        _session.AppendTurn(new ToolCallMessage(toolCalls));
+        await sessionStore.SaveAsync(cancellationToken);
+
+        IReadOnlyList<Task<ToolExecutionResult>> executionTasks = [.. toolCalls.Select(toolCall => ExecuteToolAsync(toolCall, cancellationToken))];
+        return await Task.WhenAll(executionTasks);
+    }
+
+    private async Task ExecuteObservingPhaseAsync(IReadOnlyList<ToolExecutionResult> toolResults, CancellationToken cancellationToken)
+    {
+        _session.TransitionTo(SessionState.Observing);
+        _session.AppendTurn(new ToolResultMessage(toolResults));
+        await sessionStore.SaveAsync(cancellationToken);
+        _session.TransitionTo(SessionState.Thinking);
+    }
+
+    private async Task CompleteCycleAsync(CancellationToken cancellationToken)
+    {
+        _session.TransitionTo(SessionState.Done);
+        await sessionStore.SaveAsync(cancellationToken);
+    }
+
+    private async Task FinaliseCycleAsync(CancellationToken cancellationToken)
+    {
+        _session.TransitionTo(SessionState.Idle);
+
+        eventPublisher.Publish(new SquashingBranchEvent());
+
+        string summary = await branchSquasher.SquashAsync(_session, cancellationToken);
+        _session.SquashBranch(summary);
+        await sessionStore.SaveAsync(cancellationToken);
+
+        SessionProgress progress = _session.GetProgress();
+        eventPublisher.Publish(new CycleCompletedEvent(progress.Objective, progress.Milestones));
+    }
+
+    private IReadOnlyList<string> GetPreviousToolNames()
+    {
+        if (_session.GetLastMessage() is ToolResultMessage previousToolResultMessage)
+        {
+            List<string> names = new(previousToolResultMessage.Results.Count);
+
+            for (int i = 0; i < previousToolResultMessage.Results.Count; i++)
+            {
+                names.Add(previousToolResultMessage.Results[i].ToolName);
+            }
+
+            return names;
+        }
+
+        return [];
     }
 
     private async Task<ToolExecutionResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken)
@@ -126,9 +180,9 @@ public class Orchestrator(
         try
         {
             ITool tool = toolManager.GetTool(toolName);
-            string invocationMsg = tool.GetInvocationMessage(toolCall.Arguments);
+            string invocationMessage = tool.GetInvocationMessage(toolCall.Arguments);
 
-            eventPublisher.Publish(new ToolExecutionStartedEvent(invocationMsg));
+            eventPublisher.Publish(new ToolExecutionStartedEvent(invocationMessage));
             started = true;
 
             ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
@@ -156,6 +210,14 @@ public class Orchestrator(
                 ToolName: toolName,
                 Exception: ex);
         }
+    }
+
+    private sealed record ThinkingPhaseResult(
+        IReadOnlyList<ToolCall> ToolCalls,
+        AgentFinishReason? FinishReason)
+    {
+        public bool HasToolCalls => ToolCalls.Count > 0;
+        public bool IsCompleted => FinishReason is AgentFinishReason.Stop or AgentFinishReason.Length;
     }
 
     private sealed class ToolCallBuilder

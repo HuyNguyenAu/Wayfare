@@ -11,12 +11,9 @@ internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out ReadFileArguments? readFileArguments, out string? readFileArgumentsError))
-        {
-            throw new ArgumentException($"Failed to deserialise arguments for {Name} tool. Error: {readFileArgumentsError}. Arguments: {arguments}");
-        }
-
-        return $"[{DisplayName}] [{readFileArguments.Path}] [Offset {readFileArguments.Offset}] [Limit {readFileArguments.Limit}]";
+        return toolHelpers.TryDeserializeArguments(arguments, out ReadFileArguments? args, out _)
+            ? $"[{DisplayName}] [{args.Path}] [Offset {args.Offset}] [Limit {args.Limit}]"
+            : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
@@ -54,7 +51,7 @@ internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
             bool hasMoreLines = readFileArguments.Offset + slice.Length < lines.Length;
             string result = $"[File: {readFileArguments.Path}, Offset: {readFileArguments.Offset}, Lines Read: {slice.Length}, Total Lines: {lines.Length}, Has More Lines: {(hasMoreLines ? "True" : "False")}]{Environment.NewLine}{string.Join(Environment.NewLine, slice)}";
 
-            return new ToolExecutionResult(true, $"Read {slice.Length} lines from '{readFileArguments.Path}' (offset: {readFileArguments.Offset}, limit: {readFileArguments.Limit}).", result, string.Empty);
+            return new ToolExecutionResult(true, $"Read {slice.Length} lines from '{readFileArguments.Path}'.", result, string.Empty);
         }
         catch (Exception ex)
         {
@@ -62,5 +59,5 @@ internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
         }
     }
 
-    internal record ReadFileArguments(string Path, int Offset = 0, int Limit = 2000);
+    internal record ReadFileArguments(string Path = "", int Offset = 0, int Limit = 2000);
 }

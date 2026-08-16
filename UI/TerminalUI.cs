@@ -26,6 +26,8 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
 
     public TerminalUI(IEventBroker eventBroker, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(eventBroker);
+
         _eventBroker = eventBroker;
         _markdownStreamRenderer = new MarkdownStreamRenderer();
         Console.OutputEncoding = Encoding.UTF8;
@@ -154,7 +156,11 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
             case ToolExecutionCompletedEvent e:
                 ProgressRenderer.RenderToolExecutionCompleted(e.Success, e.DisplayMessage);
                 break;
-            case SessionUpdatedEvent:
+            case SquashingBranchEvent:
+                ProgressRenderer.RenderSquashingBranch();
+                break;
+            case CycleCompletedEvent e:
+                ProgressRenderer.RenderObjectiveAndMilestones(e.Objective, e.Milestones);
                 break;
         }
     }

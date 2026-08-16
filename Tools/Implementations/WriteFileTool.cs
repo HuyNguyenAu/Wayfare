@@ -11,12 +11,9 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out WriteFileArguments? writeFileArguments, out string? writeFileArgumentsError))
-        {
-            throw new ArgumentException($"Failed to deserialise arguments for {Name} tool. Error: {writeFileArgumentsError}. Arguments: {arguments}");
-        }
-
-        return $"[{DisplayName}] [{writeFileArguments.Path}]";
+        return toolHelpers.TryDeserializeArguments(arguments, out WriteFileArguments? args, out _)
+            ? $"[{DisplayName}] [{args.Path}]"
+            : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
@@ -35,7 +32,7 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
         {
             toolHelpers.EnsureDirectoryExists(resolvedPath);
 
-            await File.WriteAllTextAsync(resolvedPath, writeFileArguments.Content ?? string.Empty, cancellationToken);
+            await File.WriteAllTextAsync(resolvedPath, writeFileArguments.Content, cancellationToken);
 
             return new ToolExecutionResult(true, $"Successfully wrote content to file '{writeFileArguments.Path}'.", $"Successfully wrote all content to file '{writeFileArguments.Path}'.", string.Empty);
         }
@@ -45,5 +42,5 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
         }
     }
 
-    internal record WriteFileArguments(string Path, string Content);
+    internal record WriteFileArguments(string Path = "", string Content = "");
 }

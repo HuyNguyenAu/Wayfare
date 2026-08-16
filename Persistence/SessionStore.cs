@@ -2,108 +2,38 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Wayfare.Core.Abstractions;
-using Wayfare.Core.Models.Messages;
+using Wayfare.Core.Models;
 
 namespace Wayfare.Persistence;
 
 public class SessionStore : ISessionStore
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new()
+    private static readonly JsonSerializerOptions _serializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false
+        WriteIndented = true
     };
-
-    public string SessionsDirectory { get; }
-    public string SessionId { get; }
-    public string CurrentFilePath { get; }
+    private readonly string _currentFilePath;
+    private readonly ISession _session = new Session();
 
     public SessionStore(string sessionsDirectory)
     {
-        if (string.IsNullOrWhiteSpace(sessionsDirectory))
-        {
-            throw new ArgumentException("Sessions directory must be specified.", nameof(sessionsDirectory));
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionsDirectory);
 
-        SessionsDirectory = sessionsDirectory;
-        Directory.CreateDirectory(SessionsDirectory);
-        SessionId = $"session_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
-        CurrentFilePath = Path.Combine(SessionsDirectory, $"{SessionId}.jsonl");
+        Directory.CreateDirectory(sessionsDirectory);
+
+        _currentFilePath = Path.Combine(sessionsDirectory, $"session_{DateTime.UtcNow:yyyyMMdd_HHmmss}.json");
     }
 
-    public async Task AppendMessageAsync(SessionMessage message, CancellationToken cancellationToken)
+    public ISession Session => _session;
+
+    public async Task SaveAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            string json = JsonSerializer.Serialize(message, SerializerOptions);
+        string json = JsonSerializer.Serialize(Session.History, _serializerOptions);
 
-            await using FileStream stream = new(
-                CurrentFilePath,
-                FileMode.Append,
-                FileAccess.Write,
-                FileShare.ReadWrite,
-                bufferSize: 4096,
-                useAsync: true);
-
-            await using StreamWriter writer = new(stream, Encoding.UTF8);
-            await writer.WriteLineAsync(json.AsMemory(), cancellationToken);
-        }
-        catch (Exception ex) when (ex is IOException or JsonException)
-        {
-            // Handle IO/serialization errors gracefully without throwing unhandled exceptions
-        }
-    }
-
-    public async Task<IReadOnlyList<SessionMessage>> LoadMessagesAsync(CancellationToken cancellationToken)
-    {
-        if (!File.Exists(CurrentFilePath))
-        {
-            return [];
-        }
-
-        List<SessionMessage> messages = [];
-
-        try
-        {
-            await using FileStream stream = new(
-                CurrentFilePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite,
-                bufferSize: 4096,
-                useAsync: true);
-
-            using StreamReader reader = new(stream, Encoding.UTF8);
-            string? line;
-
-            while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
-            {
-                if (string.IsNullOrWhiteSpace(line))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    SessionMessage? message = JsonSerializer.Deserialize<SessionMessage>(line, SerializerOptions);
-
-                    if (message is not null)
-                    {
-                        messages.Add(message);
-                    }
-                }
-                catch (JsonException)
-                {
-                    // Gracefully skip corrupted or malformed lines
-                }
-            }
-        }
-        catch (IOException)
-        {
-            // Gracefully handle IO exceptions on file read
-        }
-
-        return messages.AsReadOnly();
+        string tempFilePath = $"{_currentFilePath}.tmp";
+        await File.WriteAllTextAsync(tempFilePath, json, Encoding.UTF8, cancellationToken);
+        File.Move(tempFilePath, _currentFilePath, overwrite: true);
     }
 }

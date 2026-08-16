@@ -1,18 +1,18 @@
-using Wayfare.Core.Models;
-using Wayfare.Core.Models.Messages;
-
 namespace Wayfare.Core.Abstractions;
+
+using Wayfare.Core.Models;
+using Wayfare.Core.Models.Ast;
+using Wayfare.Core.Models.Messages;
 
 public interface ISession
 {
     SessionState State { get; }
-    IReadOnlyList<SessionMessage> Messages { get; }
+    IReadOnlyList<HistoryNode> History { get; }
 
-    void BeginThinking(string userInput);
-    void RecordThought(string content);
-    void RequestAction(IReadOnlyList<ToolCall> toolCalls);
-    void RecordObservation(IReadOnlyList<ToolExecutionResult> toolResults);
-    void ResumeThinking();
-    void Finish();
-    void Idle();
+    void StartBranch();
+    void AppendTurn(SessionMessage message);
+    void SquashBranch(string summary);
+    SessionMessage GetLastMessage();
+    SessionProgress GetProgress();
+    void TransitionTo(SessionState newState);
 }

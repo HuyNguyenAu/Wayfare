@@ -11,12 +11,9 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out ReplaceArguments? replaceArguments, out string? replaceArgumentsError))
-        {
-            throw new ArgumentException($"Failed to deserialise arguments for {Name} tool. Error: {replaceArgumentsError}. Arguments: {arguments}");
-        }
-
-        return $"[{DisplayName}] [{replaceArguments.Path}] [Old \"{replaceArguments.OldText}\"] [New \"{replaceArguments.NewText}\"]";
+        return toolHelpers.TryDeserializeArguments(arguments, out ReplaceArguments? args, out _)
+            ? $"[{DisplayName}] [{args.Path}] [Old \"{args.OldText}\"] [New \"{args.NewText}\"]"
+            : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
@@ -59,7 +56,7 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
                 return new ToolExecutionResult(false, $"Failed to replace text: target text is not unique in '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: 'oldText' matches multiple locations in '{replaceArguments.Path}'. Please include more surrounding lines/context to make the block unique.");
             }
 
-            string newContent = content.Remove(index, replaceArguments.OldText.Length).Insert(index, replaceArguments.NewText ?? string.Empty);
+            string newContent = content.Remove(index, replaceArguments.OldText.Length).Insert(index, replaceArguments.NewText);
 
             await File.WriteAllTextAsync(resolvedPath, newContent, cancellationToken);
 
@@ -71,5 +68,5 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
         }
     }
 
-    internal record ReplaceArguments(string Path, string OldText, string NewText);
+    internal record ReplaceArguments(string Path = "", string OldText = "", string NewText = "");
 }

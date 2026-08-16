@@ -12,12 +12,9 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out ExecuteCommandArguments? executeCommandArguments, out string? executeCommandArgumentsError))
-        {
-            throw new ArgumentException($"Failed to deserialise arguments for {Name} tool. Error: {executeCommandArgumentsError}. Arguments: {arguments}");
-        }
-
-        return $"[{DisplayName}] [{executeCommandArguments.Command} {executeCommandArguments.Arguments}]";
+        return toolHelpers.TryDeserializeArguments(arguments, out ExecuteCommandArguments? args, out _)
+            ? $"[{DisplayName}] [{args.Command} {args.Arguments}]".TrimEnd()
+            : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
@@ -37,7 +34,7 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
             ProcessStartInfo startInfo = new()
             {
                 FileName = executeCommandArguments.Command,
-                Arguments = executeCommandArguments.Arguments ?? string.Empty,
+                Arguments = executeCommandArguments.Arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -87,5 +84,5 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
         }
     }
 
-    internal record ExecuteCommandArguments(string Command, string? Arguments);
+    internal record ExecuteCommandArguments(string Command = "", string Arguments = "");
 }

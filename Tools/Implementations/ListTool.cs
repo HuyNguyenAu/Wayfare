@@ -11,12 +11,9 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out ListFilesArguments? listArguments, out string? listArgumentsError))
-        {
-            throw new ArgumentException($"Failed to deserialise arguments for {Name} tool. Error: {listArgumentsError}. Arguments: {arguments}");
-        }
-
-        return $"[{DisplayName}] [{listArguments.Path}]";
+        return toolHelpers.TryDeserializeArguments(arguments, out ListFilesArguments? args, out _)
+            ? $"[{DisplayName}] [{args.Path}]"
+            : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
@@ -67,5 +64,5 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
         }
     }
 
-    internal record ListFilesArguments(string Path);
+    internal record ListFilesArguments(string Path = "");
 }

@@ -67,6 +67,7 @@ public class MarkdownStreamRenderer
 
             _markdownPipe = null;
             _markdownTask = null;
+            AnsiConsole.WriteLine();
         }
     }
 

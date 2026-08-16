@@ -31,9 +31,9 @@ public class OpenAIClient(ChatClient client) : IChatClient
                 yield return new StreamingChatUpdate(
                     ToolCallUpdate: new StreamingToolCallChunk(
                         toolCallUpdate.Index,
-                        toolCallUpdate.ToolCallId,
-                        toolCallUpdate.FunctionName,
-                        toolCallUpdate.FunctionArgumentsUpdate?.ToString()
+                        toolCallUpdate.ToolCallId ?? string.Empty,
+                        toolCallUpdate.FunctionName ?? string.Empty,
+                        toolCallUpdate.FunctionArgumentsUpdate?.ToString() ?? string.Empty
                     )
                 );
             }
@@ -43,6 +43,23 @@ public class OpenAIClient(ChatClient client) : IChatClient
                 yield return new StreamingChatUpdate(FinishReason: MapFinishReason(update.FinishReason.Value));
             }
         }
+    }
+
+    public async Task<ChatCompletionResult> CompleteChatAsync(
+        IReadOnlyList<SessionMessage> sessionMessages,
+        IReadOnlyList<ITool> tools,
+        CancellationToken cancellationToken)
+    {
+        ChatCompletionOptions options = CreateChatCompletionOptions(tools);
+        List<ChatMessage> messages = MapSessionMessagesToChatMessages(sessionMessages);
+
+        ChatCompletion chatCompletion = await client.CompleteChatAsync(messages, options, cancellationToken);
+        string content = chatCompletion.Content.Count > 0 ? chatCompletion.Content[0].Text ?? string.Empty : string.Empty;
+
+        return new ChatCompletionResult(
+            Content: content,
+            FinishReason: MapFinishReason(chatCompletion.FinishReason)
+        );
     }
 
     private static ChatCompletionOptions CreateChatCompletionOptions(IReadOnlyList<ITool> tools)

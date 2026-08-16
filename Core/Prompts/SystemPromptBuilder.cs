@@ -7,6 +7,8 @@ public static class SystemPromptBuilder
 {
     public static string Build(IReadOnlyList<ITool> tools)
     {
+        ArgumentNullException.ThrowIfNull(tools);
+
         StringBuilder promptBuilder = new();
 
         promptBuilder.AppendLine("You are a coding agent harness. You help users by reading and editing files.");

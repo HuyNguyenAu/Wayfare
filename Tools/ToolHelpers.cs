@@ -10,6 +10,8 @@ public class ToolHelpers : IToolHelpers
 
     public bool TryDeserializeArguments<T>(string arguments, [NotNullWhen(true)] out T? args, [NotNullWhen(false)] out string? errorMessage) where T : class
     {
+        ArgumentNullException.ThrowIfNull(arguments);
+
         try
         {
             T? result = JsonSerializer.Deserialize<T>(arguments, JsonOptions);
@@ -43,9 +45,9 @@ public class ToolHelpers : IToolHelpers
         }
     }
 
-    public bool TryGetRequiredPath(string? path, [NotNullWhen(true)] out string? resolvedPath, [NotNullWhen(false)] out string? errorMessage)
+    public bool TryGetRequiredPath(string path, [NotNullWhen(true)] out string? resolvedPath, [NotNullWhen(false)] out string? errorMessage)
     {
-        if (string.IsNullOrEmpty(path))
+        if (string.IsNullOrWhiteSpace(path))
         {
             resolvedPath = null;
             errorMessage = "'path' is required.";
@@ -77,11 +79,9 @@ public class ToolHelpers : IToolHelpers
     {
         string? directory = Path.GetDirectoryName(path);
 
-        if (string.IsNullOrEmpty(directory) || Directory.Exists(directory))
+        if (!string.IsNullOrEmpty(directory))
         {
-            return;
+            Directory.CreateDirectory(directory);
         }
-
-        Directory.CreateDirectory(directory);
     }
 }
