@@ -17,12 +17,8 @@ public sealed class EventBroker : IEventBroker
 
     public void Publish(IEvent @event)
     {
+        ArgumentNullException.ThrowIfNull(@event);
         _channel.Writer.TryWrite(@event);
-    }
-
-    public ValueTask PublishAsync(IEvent @event, CancellationToken cancellationToken)
-    {
-        return _channel.Writer.WriteAsync(@event, cancellationToken);
     }
 
     public IAsyncEnumerable<IEvent> ReadAllAsync(CancellationToken cancellationToken)

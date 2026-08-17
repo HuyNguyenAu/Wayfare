@@ -12,11 +12,22 @@ using Wayfare.Tools.Implementations;
 using Wayfare.UI;
 
 
-public class Program
+public static class Program
 {
     public static async Task Main()
     {
-        Settings settings = Settings.FromEnvironment();
+        Settings settings;
+
+        try
+        {
+            settings = Settings.FromEnvironment();
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"Configuration initialisation failed: {exception.Message}");
+            Environment.ExitCode = 1;
+            return;
+        }
 
         OpenAI.Chat.ChatClient openAIChatClient = new(
             settings.ModelName,
@@ -39,8 +50,9 @@ public class Program
         await using TerminalUI terminalUI = new(eventBroker, cancellationTokenSource.Token);
 
         await using SessionStore sessionStore = new(settings.SessionsDirectory);
+        ToolHelpers toolHelpers = new(settings.ExcludedDirectories);
         InspectMilestoneTool inspectMilestoneTool = new(sessionStore.Session);
-        ToolManager toolManager = new(eventBroker, [inspectMilestoneTool]);
+        ToolManager toolManager = new(eventBroker, [inspectMilestoneTool], toolHelpers);
 
         eventBroker.Publish(new StartupStartedEvent());
         await toolManager.LoadToolsAsync(settings.ToolsPath, "*.cs", settings.CompiledDirectory, cancellationTokenSource.Token);
@@ -60,7 +72,7 @@ public class Program
         eventBroker.Publish(new AgentStartedEvent());
 
         BranchSquasher branchSquasher = new(chatClient);
-        MessagePromptBuilder messagePromptBuilder = new();
+        MessagePromptBuilder messagePromptBuilder = new(settings.MaxActiveObservationsToRetain);
         IntentResolver intentResolver = new(chatClient);
         PivotDetector pivotDetector = new();
         CircuitBreaker circuitBreaker = new(settings.MaxTurns);

@@ -4,6 +4,8 @@ using Wayfare.Tools;
 
 internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
 {
+    private readonly IToolHelpers _toolHelpers = toolHelpers ?? throw new ArgumentNullException(nameof(toolHelpers));
+
     public string Name => "write";
     public string DisplayName => "Write";
     public string Description => "Write content to a file, creating it if it does not exist or overwriting it if it does. Use this only for new files or full rewrites. To make targeted edits to an existing file, use replace instead. Parameters: path (string, required), content (string, required - the full content to write).";
@@ -16,26 +18,26 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        return toolHelpers.TryDeserialiseArguments(arguments, out WriteFileArguments? parsedArguments, out _)
+        return _toolHelpers.TryDeserialiseArguments(arguments, out WriteFileArguments? parsedArguments, out _)
             ? $"[{DisplayName}] [{parsedArguments.Path}]"
             : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
-        if (!toolHelpers.TryDeserialiseArguments(arguments, out WriteFileArguments? writeFileArguments, out string? writeFileArgumentsError))
+        if (!_toolHelpers.TryDeserialiseArguments(arguments, out WriteFileArguments? writeFileArguments, out string? writeFileArgumentsError))
         {
             return new ToolExecutionResult(false, "Failed to write file due to invalid tool arguments.", string.Empty, $"Failed to write file: invalid tool arguments. Error: {writeFileArgumentsError}. Usage: {{\"path\": \"<file_path>\", \"content\": \"<file_content>\"}}");
         }
 
-        if (!toolHelpers.TryGetRequiredPath(writeFileArguments.Path, out string? resolvedPath, out string? requiredPathError))
+        if (!_toolHelpers.TryGetRequiredPath(writeFileArguments.Path, out string? resolvedPath, out string? requiredPathError))
         {
             return new ToolExecutionResult(false, $"Failed to write file: access denied or invalid path '{writeFileArguments.Path}'.", string.Empty, $"Failed to write file: access denied or invalid path '{writeFileArguments.Path}'. Path must be within the working directory.");
         }
 
         try
         {
-            toolHelpers.EnsureDirectoryExists(resolvedPath);
+            _toolHelpers.EnsureDirectoryExists(resolvedPath);
 
             await File.WriteAllTextAsync(resolvedPath, writeFileArguments.Content, cancellationToken);
 
@@ -43,7 +45,7 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
         }
         catch (Exception exception)
         {
-            return new ToolExecutionResult(false, $"An unexpected error occurred while writing to file '{writeFileArguments.Path}'.", string.Empty, $"Failed to write file: an unexpected error occurred. Error: {exception.Message}", exception);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while writing to file '{writeFileArguments.Path}'.", string.Empty, $"Failed to write file: an unexpected error occurred. Error: {exception.Message}");
         }
     }
 

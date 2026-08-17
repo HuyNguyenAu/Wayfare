@@ -6,7 +6,7 @@ using Spectre.Console;
 using Wayfare.Infrastructure.Events;
 using Wayfare.UI.Components;
 
-public class TerminalUI : ITerminalUI, IAsyncDisposable
+public sealed class TerminalUI : ITerminalUI, IAsyncDisposable
 {
     private bool _disposed;
     private bool _hasPrompted;
@@ -17,6 +17,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
     private readonly ThinkingStreamRenderer _thinkingStreamRenderer;
     private readonly MarkdownStreamRenderer _markdownStreamRenderer;
     private readonly TaskCompletionSource _agentReadyTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Dictionary<Type, Func<IEvent, CancellationToken, Task>> _eventHandlers;
 
     public TerminalUI(IEventBroker eventBroker, CancellationToken cancellationToken)
     {
@@ -27,6 +28,27 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         _markdownStreamRenderer = new MarkdownStreamRenderer();
         Console.OutputEncoding = Encoding.UTF8;
         AnsiConsole.Clear();
+
+        _eventHandlers = new()
+        {
+            [typeof(StartupStartedEvent)] = (_, _) => { ProgressRenderer.RenderStartupStarted(); return Task.CompletedTask; },
+            [typeof(StartupCompletedEvent)] = (_, _) => { ProgressRenderer.RenderStartupCompleted(); return Task.CompletedTask; },
+            [typeof(AgentStartedEvent)] = (_, _) => { ProgressRenderer.RenderStartAgent(); _agentReadyTaskCompletionSource.TrySetResult(); return Task.CompletedTask; },
+            [typeof(ToolCompilationStartedEvent)] = (eventInstance, _) => { EnsureToolsHeaderRendered(); ProgressRenderer.RenderToolCompilationStarted(((ToolCompilationStartedEvent)eventInstance).ToolName); return Task.CompletedTask; },
+            [typeof(ToolCompilationCompletedEvent)] = (_, _) => { ProgressRenderer.RenderToolCompilationCompleted(); return Task.CompletedTask; },
+            [typeof(ToolCompilationFailedEvent)] = (eventInstance, _) => { EnsureToolsHeaderRendered(); ToolCompilationFailedEvent failedEvent = (ToolCompilationFailedEvent)eventInstance; ProgressRenderer.RenderToolCompilationFailed(failedEvent.ToolName, failedEvent.Error); return Task.CompletedTask; },
+            [typeof(ToolLoadingStartedEvent)] = (eventInstance, _) => { EnsureToolsHeaderRendered(); ProgressRenderer.RenderToolLoadingStarted(((ToolLoadingStartedEvent)eventInstance).ToolName); return Task.CompletedTask; },
+            [typeof(ToolLoadingCompletedEvent)] = (_, _) => { ProgressRenderer.RenderToolLoadingCompleted(); return Task.CompletedTask; },
+            [typeof(ToolLoadingFailedEvent)] = (eventInstance, _) => { EnsureToolsHeaderRendered(); ToolLoadingFailedEvent loadingFailedEvent = (ToolLoadingFailedEvent)eventInstance; ProgressRenderer.RenderToolLoadingFailed(loadingFailedEvent.ToolName, loadingFailedEvent.Error); return Task.CompletedTask; },
+            [typeof(ChatRequestStartedEvent)] = (eventInstance, cancellationToken) => { ChatRequestStartedEvent chatStartedEvent = (ChatRequestStartedEvent)eventInstance; ProgressRenderer.RenderChatRequestStarted(chatStartedEvent.ToolNames); _thinkingStreamRenderer.StartStream(); _markdownStreamRenderer.StartStream(cancellationToken); return Task.CompletedTask; },
+            [typeof(ChatRequestCompletedEvent)] = async (_, _) => { await _thinkingStreamRenderer.CompleteStreamAsync(); await _markdownStreamRenderer.CompleteStreamAsync(); },
+            [typeof(ThinkingChunkReceivedEvent)] = async (eventInstance, cancellationToken) => { ThinkingChunkReceivedEvent thinkingEvent = (ThinkingChunkReceivedEvent)eventInstance; await _thinkingStreamRenderer.AppendChunkAsync(thinkingEvent.Content, cancellationToken); _markdownStreamRenderer.HeaderCompleted = true; },
+            [typeof(TokenChunkReceivedEvent)] = async (eventInstance, cancellationToken) => { TokenChunkReceivedEvent tokenEvent = (TokenChunkReceivedEvent)eventInstance; await _thinkingStreamRenderer.CompleteStreamAsync(); await _markdownStreamRenderer.AppendChunkAsync(tokenEvent.Content, cancellationToken); },
+            [typeof(ToolExecutionStartedEvent)] = (eventInstance, _) => { ToolExecutionStartedEvent executionStartedEvent = (ToolExecutionStartedEvent)eventInstance; ProgressRenderer.RenderToolExecutionStarted(executionStartedEvent.InvocationMessage); return Task.CompletedTask; },
+            [typeof(ToolExecutionCompletedEvent)] = (eventInstance, _) => { ToolExecutionCompletedEvent executionCompletedEvent = (ToolExecutionCompletedEvent)eventInstance; ProgressRenderer.RenderToolExecutionCompleted(executionCompletedEvent.Success, executionCompletedEvent.DisplayMessage); return Task.CompletedTask; },
+            [typeof(SquashingBranchEvent)] = (_, _) => { ProgressRenderer.RenderSquashingBranch(); return Task.CompletedTask; },
+            [typeof(CycleCompletedEvent)] = (eventInstance, _) => { CycleCompletedEvent cycleCompletedEvent = (CycleCompletedEvent)eventInstance; ProgressRenderer.RenderObjectiveAndMilestones(cycleCompletedEvent.Objective, cycleCompletedEvent.Milestones); return Task.CompletedTask; },
+        };
 
         _eventLoopTask = Task.Run(() => ProcessEventsAsync(cancellationToken), cancellationToken);
     }
@@ -63,7 +85,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         }
         catch (Exception exception) when (exception is OperationCanceledException or ChannelClosedException)
         {
-            // Expected completion / cancellation
+            // Expected completion / cancellation.
         }
     }
 
@@ -78,7 +100,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         }
         catch (Exception exception) when (exception is OperationCanceledException or ChannelClosedException)
         {
-            // Shutdown expected
+            // Shutdown expected.
         }
         catch (Exception exception)
         {
@@ -103,69 +125,9 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
 
     private async Task HandleEventAsync(IEvent @event, CancellationToken cancellationToken)
     {
-        switch (@event)
+        if (_eventHandlers.TryGetValue(@event.GetType(), out Func<IEvent, CancellationToken, Task>? handler))
         {
-            case StartupStartedEvent:
-                ProgressRenderer.RenderStartupStarted();
-                break;
-            case StartupCompletedEvent:
-                ProgressRenderer.RenderStartupCompleted();
-                break;
-            case AgentStartedEvent:
-                ProgressRenderer.RenderStartAgent();
-                _agentReadyTaskCompletionSource.TrySetResult();
-                break;
-            case ToolCompilationStartedEvent toolCompilationStartedEvent:
-                EnsureToolsHeaderRendered();
-                ProgressRenderer.RenderToolCompilationStarted(toolCompilationStartedEvent.ToolName);
-                break;
-            case ToolCompilationCompletedEvent:
-                ProgressRenderer.RenderToolCompilationCompleted();
-                break;
-            case ToolCompilationFailedEvent toolCompilationFailedEvent:
-                EnsureToolsHeaderRendered();
-                ProgressRenderer.RenderToolCompilationFailed(toolCompilationFailedEvent.ToolName, toolCompilationFailedEvent.Error);
-                break;
-            case ToolLoadingStartedEvent toolLoadingStartedEvent:
-                EnsureToolsHeaderRendered();
-                ProgressRenderer.RenderToolLoadingStarted(toolLoadingStartedEvent.ToolName);
-                break;
-            case ToolLoadingCompletedEvent:
-                ProgressRenderer.RenderToolLoadingCompleted();
-                break;
-            case ToolLoadingFailedEvent toolLoadingFailedEvent:
-                EnsureToolsHeaderRendered();
-                ProgressRenderer.RenderToolLoadingFailed(toolLoadingFailedEvent.ToolName, toolLoadingFailedEvent.Error);
-                break;
-            case ChatRequestStartedEvent chatRequestStartedEvent:
-                ProgressRenderer.RenderChatRequestStarted(chatRequestStartedEvent.ToolNames);
-                _thinkingStreamRenderer.StartStream();
-                _markdownStreamRenderer.StartStream(cancellationToken);
-                break;
-            case ChatRequestCompletedEvent:
-                await _thinkingStreamRenderer.CompleteStreamAsync();
-                await _markdownStreamRenderer.CompleteStreamAsync();
-                break;
-            case ThinkingChunkReceivedEvent thinkingChunkReceivedEvent:
-                await _thinkingStreamRenderer.AppendChunkAsync(thinkingChunkReceivedEvent.Content, cancellationToken);
-                _markdownStreamRenderer.HeaderCompleted = true;
-                break;
-            case TokenChunkReceivedEvent tokenChunkReceivedEvent:
-                await _thinkingStreamRenderer.CompleteStreamAsync();
-                await _markdownStreamRenderer.AppendChunkAsync(tokenChunkReceivedEvent.Content, cancellationToken);
-                break;
-            case ToolExecutionStartedEvent toolExecutionStartedEvent:
-                ProgressRenderer.RenderToolExecutionStarted(toolExecutionStartedEvent.InvocationMessage);
-                break;
-            case ToolExecutionCompletedEvent toolExecutionCompletedEvent:
-                ProgressRenderer.RenderToolExecutionCompleted(toolExecutionCompletedEvent.Success, toolExecutionCompletedEvent.DisplayMessage);
-                break;
-            case SquashingBranchEvent:
-                ProgressRenderer.RenderSquashingBranch();
-                break;
-            case CycleCompletedEvent cycleCompletedEvent:
-                ProgressRenderer.RenderObjectiveAndMilestones(cycleCompletedEvent.Objective, cycleCompletedEvent.Milestones);
-                break;
+            await handler(@event, cancellationToken);
         }
     }
 
@@ -189,7 +151,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         }
         catch (Exception exception) when (exception is OperationCanceledException or ChannelClosedException)
         {
-            // Ignore task cancellation
+            // Ignore task cancellation.
         }
 
         _markdownStreamRenderer.ForceDisposePipe();

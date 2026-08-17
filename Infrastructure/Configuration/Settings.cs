@@ -2,6 +2,8 @@ namespace Wayfare.Infrastructure.Configuration;
 
 public sealed record Settings
 {
+    public static readonly IReadOnlyList<string> DefaultExcludedDirectories = [".git", "bin", "obj", "node_modules", ".vs"];
+
     public required string ModelName { get; init; }
     public required string ApiKey { get; init; }
     public required string Endpoint { get; init; }
@@ -9,6 +11,8 @@ public sealed record Settings
     public required string CompiledDirectory { get; init; }
     public required string SessionsDirectory { get; init; }
     public int MaxTurns { get; init; } = 15;
+    public int MaxActiveObservationsToRetain { get; init; } = 2;
+    public IReadOnlyList<string> ExcludedDirectories { get; init; } = DefaultExcludedDirectories;
 
     public static Settings FromEnvironment()
     {
@@ -22,7 +26,9 @@ public sealed record Settings
             ToolsPath = GetValue("TOOLS_PATH"),
             CompiledDirectory = GetValue("COMPILED_DIRECTORY"),
             SessionsDirectory = GetValue("SESSIONS_DIRECTORY"),
-            MaxTurns = GetOptionalInt("MAX_TURNS", 15)
+            MaxTurns = GetOptionalInt("MAX_TURNS", 15),
+            MaxActiveObservationsToRetain = GetOptionalInt("MAX_ACTIVE_OBSERVATIONS_TO_RETAIN", 2, allowZero: true),
+            ExcludedDirectories = GetOptionalStringList("EXCLUDED_DIRECTORIES", DefaultExcludedDirectories)
         };
     }
 
@@ -38,7 +44,7 @@ public sealed record Settings
         return value;
     }
 
-    private static int GetOptionalInt(string key, int defaultValue)
+    private static int GetOptionalInt(string key, int defaultValue, bool allowZero = false)
     {
         string? value = Environment.GetEnvironmentVariable(key);
 
@@ -47,11 +53,23 @@ public sealed record Settings
             return defaultValue;
         }
 
-        if (int.TryParse(value, out int parsedInt) && parsedInt > 0)
+        if (int.TryParse(value, out int parsedInt) && (allowZero ? parsedInt >= 0 : parsedInt > 0))
         {
             return parsedInt;
         }
 
-        throw new InvalidOperationException($"Environment variable '{key}' must be a positive integer.");
+        throw new InvalidOperationException($"Environment variable '{key}' must be a {(allowZero ? "non-negative" : "positive")} integer.");
+    }
+
+    private static IReadOnlyList<string> GetOptionalStringList(string key, IReadOnlyList<string> defaultValue)
+    {
+        string? value = Environment.GetEnvironmentVariable(key);
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return defaultValue;
+        }
+
+        return [.. value.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
     }
 }

@@ -1,6 +1,6 @@
 namespace Wayfare.Agent;
 
-public class PivotDetector : IPivotDetector
+public sealed class PivotDetector : IPivotDetector
 {
     private static readonly string[] _pivotPhrases =
     [

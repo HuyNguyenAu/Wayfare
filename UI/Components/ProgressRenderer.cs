@@ -76,7 +76,7 @@ public static class ProgressRenderer
     {
         string statusDescription = toolNames.Count > 0
             ? $"Synthesising signals across [{string.Join(", ", toolNames)}]..."
-            : "Channeling cognitive currents...";
+            : "Channelling cognitive currents...";
 
         AnsiConsole.Markup($"[{ColourPalette.HexBiolumAzure}]⁖ {Markup.Escape("[DELIBERATING]")}[/] {Markup.Escape(statusDescription)}");
     }

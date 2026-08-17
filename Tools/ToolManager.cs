@@ -9,10 +9,13 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Wayfare.Infrastructure.Events;
 
-public class LoadToolException(string message, Exception? innerException = null) : Exception(message, innerException);
+public sealed class LoadToolException(string message, Exception? innerException = null) : Exception(message, innerException);
 
-public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> builtInTools) : IToolManager
+public sealed class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> builtInTools, IToolHelpers toolHelpers) : IToolManager
 {
+    private readonly IEventPublisher _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
+    private readonly IReadOnlyList<ITool> _builtInTools = builtInTools ?? throw new ArgumentNullException(nameof(builtInTools));
+    private readonly IToolHelpers _toolHelpers = toolHelpers ?? throw new ArgumentNullException(nameof(toolHelpers));
     private readonly string[] _ignoreFiles = ["ITool.cs", "ToolHelpers.cs", "InspectMilestoneTool.cs"];
 
     public IReadOnlyList<ITool> Tools { get; private set; } = [];
@@ -20,14 +23,20 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
 
     public async Task LoadToolsAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directoryPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(searchPattern);
+        ArgumentException.ThrowIfNullOrWhiteSpace(compiledDirectoryPath);
+
         LoadToolsResult loadToolsResult = await LoadToolsFromDirectoryAsync(directoryPath, searchPattern, compiledDirectoryPath, cancellationToken);
 
-        Tools = [.. builtInTools, .. loadToolsResult.Tools];
+        Tools = [.. _builtInTools, .. loadToolsResult.Tools];
         Errors = loadToolsResult.Errors;
     }
 
     public ITool GetTool(string name)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
         ITool? tool = Tools.FirstOrDefault(toolCandidate => toolCandidate.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"No tool found with name '{name}'");
 
@@ -36,19 +45,9 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
 
     private async Task<LoadToolsResult> LoadToolsFromDirectoryAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(directoryPath))
-        {
-            throw new ArgumentException("A valid tool directory path must be provided", nameof(directoryPath));
-        }
-
         if (!Directory.Exists(directoryPath))
         {
             throw new ArgumentException($"Tool directory does not exist '{directoryPath}'", nameof(directoryPath));
-        }
-
-        if (string.IsNullOrWhiteSpace(compiledDirectoryPath))
-        {
-            throw new ArgumentException("A valid tool compiled directory path must be provided", nameof(compiledDirectoryPath));
         }
 
         Directory.CreateDirectory(compiledDirectoryPath);
@@ -125,7 +124,7 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
                         }
                         catch
                         {
-                            // Best-effort cleanup after compilation failure
+                            // Best effort cleanup after compilation failure.
                         }
                     }
                 }
@@ -252,10 +251,8 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
         throw new LoadToolException($"Failed to compile tool '{toolPath}' because {errors}");
     }
 
-    private static ITool LoadTool(string toolPath)
+    private ITool LoadTool(string toolPath)
     {
-        IToolHelpers toolHelpers = new ToolHelpers();
-
         try
         {
             using FileStream toolFileStream = new(toolPath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -264,7 +261,7 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
             Type toolType = assembly.GetTypes().FirstOrDefault(typeCandidate => typeof(ITool).IsAssignableFrom(typeCandidate) && !typeCandidate.IsInterface && !typeCandidate.IsAbstract)
                 ?? throw new LoadToolException($"No valid implementation of ITool found in assembly '{toolPath}'.");
 
-            if (Activator.CreateInstance(toolType, toolHelpers) is not ITool toolInstance)
+            if (Activator.CreateInstance(toolType, _toolHelpers) is not ITool toolInstance)
             {
                 throw new LoadToolException($"Failed to load tool from '{toolPath}' because the type '{toolType.FullName}' does not implement ITool or could not be instantiated.");
             }

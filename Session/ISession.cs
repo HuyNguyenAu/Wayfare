@@ -8,9 +8,10 @@ public interface ISession
 
     void StartBranch();
     void AppendTurn(SessionMessage message);
+    void RollbackLastTurns(int count);
     void SquashBranch(string summary, BranchStatus status);
     void UpdateIntent(string intent);
-    SessionMessage GetLastMessage();
+    SessionMessage? GetLastMessage();
     SessionProgress GetProgress();
     void TransitionTo(SessionState newState);
 }

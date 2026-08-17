@@ -4,53 +4,38 @@ using System.Text;
 using Wayfare.Session;
 using Wayfare.Tools;
 
-#region System Prompt Builder
-
 public static class SystemPromptBuilder
 {
-    public static string Build(IReadOnlyList<ITool> tools)
+    public static string Build()
     {
-        ArgumentNullException.ThrowIfNull(tools);
-
         StringBuilder promptBuilder = new();
 
-        promptBuilder.AppendLine("You assist human co-creators by nurturing codebases as living ecosystems—reading, editing, and cultivating sustainable code health.");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Available tools:");
-
-        foreach (ITool tool in tools)
-        {
-            promptBuilder.AppendLine($"- {tool.Name}: {tool.Description}");
-        }
-
+        promptBuilder.AppendLine("You are an expert autonomous software engineer.");
         promptBuilder.AppendLine();
         promptBuilder.AppendLine("Rules:");
-        promptBuilder.AppendLine("- To see what files exist, use list or find.");
-        promptBuilder.AppendLine("- To read a file, use read.");
-        promptBuilder.AppendLine("- To edit a file, use replace. The oldText must match exactly what is in the file, including whitespace.");
-        promptBuilder.AppendLine("- The oldText in replace must appear exactly once in the file. If it appears more than once, add more surrounding lines to make it unique.");
-        promptBuilder.AppendLine("- To create a new file or completely overwrite one, use write.");
-        promptBuilder.AppendLine("- To view all turns of a past milestone, use inspect_milestone with its id.");
-        promptBuilder.AppendLine("- Always read a file before editing it.");
-        promptBuilder.AppendLine("- Keep responses short and focused. Show exact file paths when working with files.");
+        promptBuilder.AppendLine("- Read a file before editing it.");
+        promptBuilder.AppendLine("- When editing with replace, oldText must match the file content exactly, including whitespace.");
+        promptBuilder.AppendLine("- Keep responses concise and focused.");
         promptBuilder.AppendLine();
-        promptBuilder.AppendLine($"Current date: {DateTime.UtcNow:yyyy-MM-dd HH:mm UTC}");
-        promptBuilder.AppendLine($"Current operating system: {Environment.OSVersion}");
-        promptBuilder.AppendLine($"Current working directory: {Directory.GetCurrentDirectory()}");
+        promptBuilder.AppendLine($"Operating system: {Environment.OSVersion}");
+        promptBuilder.AppendLine($"Working directory: {Directory.GetCurrentDirectory()}");
 
         return promptBuilder.ToString();
     }
 }
 
-#endregion
-
-#region Message Prompt Builder
-
-public class MessagePromptBuilder : IMessagePromptBuilder
+public sealed class MessagePromptBuilder : IMessagePromptBuilder
 {
-    public IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<ITool> tools, IReadOnlyList<HistoryNode> history, string intent)
+    private readonly int _maxActiveObservationsToRetain;
+
+    public MessagePromptBuilder(int maxActiveObservationsToRetain)
     {
-        ArgumentNullException.ThrowIfNull(tools);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxActiveObservationsToRetain);
+        _maxActiveObservationsToRetain = maxActiveObservationsToRetain;
+    }
+
+    public IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<HistoryNode> history, string intent)
+    {
         ArgumentNullException.ThrowIfNull(history);
         ArgumentNullException.ThrowIfNull(intent);
 
@@ -60,112 +45,89 @@ public class MessagePromptBuilder : IMessagePromptBuilder
         }
 
         List<SessionMessage> messages = [
-            new SystemMessage(SystemPromptBuilder.Build(tools))
+            new SystemMessage(SystemPromptBuilder.Build())
         ];
 
-        if (history.Count > 1)
+        List<TurnNode> turns = activeBranch.Turns;
+
+        List<int> toolResultIndices = [];
+
+        for (int turnIndex = 0; turnIndex < turns.Count; turnIndex++)
         {
-            messages.Add(new UserMessage(BuildLinearTrunk(history, intent, activeBranch.Id)));
-            messages.Add(new AssistantMessage("Acknowledged completed milestones and active intent. Proceeding with active horizon."));
-        }
-        else
-        {
-            messages.Add(new UserMessage(BuildInitialIntentHeader(intent, activeBranch.Id)));
-            messages.Add(new AssistantMessage("Acknowledged active intent. Proceeding with active horizon."));
+            if (turns[turnIndex].Message is ToolResultMessage)
+            {
+                toolResultIndices.Add(turnIndex);
+            }
         }
 
-        foreach (TurnNode turn in activeBranch.Turns)
+        HashSet<int> indicesToTombstone = [.. toolResultIndices.Take(Math.Max(0, toolResultIndices.Count - _maxActiveObservationsToRetain))];
+
+        for (int turnIndex = 0; turnIndex < turns.Count; turnIndex++)
         {
-            messages.Add(turn.Message);
+            SessionMessage turnMessage = turns[turnIndex].Message;
+
+            if (indicesToTombstone.Contains(turnIndex) && turnMessage is ToolResultMessage toolResultMessage)
+            {
+                List<ToolExecutionResult> compactResults = [.. toolResultMessage.Results.Select(result => result with
+                {
+                    Result = $"<observation tool=\"{result.ToolName}\" status=\"tombstoned\">[Historical output compacted]</observation>",
+                    DisplayMessage = "[Compacted historical observation]"
+                })];
+
+                messages.Add(new ToolResultMessage(compactResults));
+            }
+            else
+            {
+                messages.Add(turnMessage);
+            }
         }
+
+        string stateBoard = $"""
+        <state_board>
+        Active Goal: {(string.IsNullOrWhiteSpace(intent) ? "Complete user task" : intent)}
+        Working Directory: {Directory.GetCurrentDirectory()}
+        </state_board>
+        """;
+
+        messages.Add(new UserMessage(stateBoard));
 
         return messages.AsReadOnly();
     }
-
-    private static string BuildLinearTrunk(IReadOnlyList<HistoryNode> history, string intent, string activeBranchId)
-    {
-        StringBuilder trunk = new();
-        trunk.AppendLine("### Active Intent");
-        trunk.AppendLine(string.IsNullOrWhiteSpace(intent) ? "(None)" : intent);
-        trunk.AppendLine();
-        trunk.AppendLine("Milestones:");
-
-        for (int milestoneIndex = 0; milestoneIndex < history.Count - 1; milestoneIndex++)
-        {
-            BranchNode branch = (BranchNode)history[milestoneIndex];
-            string statusTag = branch.Status == BranchStatus.Abandoned ? " [Abandoned]" : string.Empty;
-            trunk.AppendLine($"{milestoneIndex + 1}. [{branch.Id}]{statusTag}: {branch.Summary}");
-        }
-
-        trunk.AppendLine();
-        trunk.AppendLine($"Active Horizon: Milestone [{activeBranchId}]");
-        trunk.AppendLine("Note: Past turns are squashed into milestones. Call inspect_milestone(id) to view all previous turns of that milestone.");
-
-        return trunk.ToString();
-    }
-
-    private static string BuildInitialIntentHeader(string intent, string activeBranchId)
-    {
-        StringBuilder header = new();
-        header.AppendLine("### Active Intent");
-        header.AppendLine(string.IsNullOrWhiteSpace(intent) ? "(None)" : intent);
-        header.AppendLine();
-        header.AppendLine($"Active Horizon: Milestone [{activeBranchId}]");
-
-        return header.ToString();
-    }
 }
-
-#endregion
-
-#region Intent Prompt Builder
 
 public static class IntentPromptBuilder
 {
-    public static string BuildSystem()
-    {
-        StringBuilder builder = new();
-        builder.AppendLine("You are an intent summariser for a coding assistant.");
-        builder.AppendLine("Given the current session intent and new user input, state the active goal in 1-2 concise sentences.");
-        builder.AppendLine("Output ONLY the goal text without any labels, introductory, or concluding remarks.");
-
-        return builder.ToString();
-    }
+    public static string BuildSystem() => """
+        Extract the active goal from user input. Wrap the active goal in <goal>...</goal>.
+        Example:
+        <goal>Fix null reference exception in SessionStore.cs</goal>
+        """;
 
     public static string BuildUser(string currentIntent, string userInput)
     {
         ArgumentNullException.ThrowIfNull(currentIntent);
         ArgumentException.ThrowIfNullOrWhiteSpace(userInput);
 
-        StringBuilder builder = new();
-        builder.AppendLine($"Current Session Intent: {(string.IsNullOrWhiteSpace(currentIntent) ? "(None)" : currentIntent)}");
-        builder.AppendLine($"User Input: {userInput}");
-
-        return builder.ToString();
+        return $"""
+        <current_intent>{(string.IsNullOrWhiteSpace(currentIntent) ? "none" : currentIntent.Trim())}</current_intent>
+        <user_input>{userInput.Trim()}</user_input>
+        """;
     }
 }
-
-#endregion
-
-#region Squash Prompt Builder
 
 public static class SquashPromptBuilder
 {
-    public static string Build()
-    {
-        StringBuilder promptBuilder = new();
+    public static string Build() => """
+        Summarise the milestone from the execution trace. Wrap the summary in <milestone_summary>...</milestone_summary> using STARL format (Situation, Task, Action, Result, Learnings).
+        Each section must be 1-2 concise sentences.
 
-        promptBuilder.AppendLine("You are a concise technical summariser. Extract the key milestone data from the provided execution trace.");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Follow the STARL format (Situation, Task, Action, Result, Learnings) exactly.");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Rules:");
-        promptBuilder.AppendLine("- Be strictly factual and concise. No conversational filler, intros, or outros.");
-        promptBuilder.AppendLine("- Keep each field to 1-2 sentences.");
-        promptBuilder.AppendLine("- Output ONLY the formatted text below.");
-
-        return promptBuilder.ToString();
-    }
+        Example:
+        <milestone_summary>
+        Situation: Context before starting this branch.
+        Task: Specific task or goal.
+        Action: Steps taken to address the task.
+        Result: Concrete outcome or produced artifacts.
+        Learnings: Key insights or constraints discovered.
+        </milestone_summary>
+        """;
 }
-
-#endregion

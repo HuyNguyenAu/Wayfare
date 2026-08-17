@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
 
-public class SessionStore : ISessionStore
+public sealed class SessionStore : ISessionStore
 {
     private static readonly JsonSerializerOptions _serialiserOptions = new()
     {
@@ -97,7 +97,7 @@ public class SessionStore : ISessionStore
         }
         catch (Exception)
         {
-            // Ignore cancellation on background task shutdown
+            // Ignore cancellation on background task shutdown.
         }
 
         try

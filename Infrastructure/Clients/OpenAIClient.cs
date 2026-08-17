@@ -6,8 +6,6 @@ using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Wayfare.Infrastructure.AI;
 
-#region Delegating Chat Client Implementation
-
 public class OpenAIClient : DelegatingChatClient
 {
     public OpenAIClient(IChatClient innerClient) : base(innerClient)
@@ -20,6 +18,8 @@ public class OpenAIClient : DelegatingChatClient
         ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(chatMessages);
+
         await foreach (ChatResponseUpdate update in base.GetStreamingResponseAsync(chatMessages, options, cancellationToken))
         {
             string? reasoning = ExtractReasoningFromUpdate(update);
@@ -38,6 +38,8 @@ public class OpenAIClient : DelegatingChatClient
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(chatMessages);
+
         ChatResponse response = await base.GetResponseAsync(chatMessages, options, cancellationToken);
         string? reasoning = ExtractReasoningFromResponse(response);
 
@@ -48,8 +50,6 @@ public class OpenAIClient : DelegatingChatClient
 
         return response;
     }
-
-    #region Internal Reasoning Extraction Helpers
 
     internal static string? ExtractReasoningFromUpdate(ChatResponseUpdate update)
     {
@@ -71,10 +71,12 @@ public class OpenAIClient : DelegatingChatClient
         return null;
     }
 
+    private static readonly string[] _reasoningPropertyNames = ["reasoning_content", "reasoning", "thought"];
+
     internal static string? ExtractReasoningContent(OpenAI.Chat.StreamingChatCompletionUpdate update)
     {
-        BinaryData data = ModelReaderWriter.Write(update);
-        using JsonDocument document = JsonDocument.Parse(data);
+        BinaryData serialisedData = ModelReaderWriter.Write(update);
+        using JsonDocument document = JsonDocument.Parse(serialisedData);
 
         if (!document.RootElement.TryGetProperty("choices", out JsonElement choices) || choices.GetArrayLength() == 0)
         {
@@ -85,20 +87,7 @@ public class OpenAIClient : DelegatingChatClient
 
         if (firstChoice.TryGetProperty("delta", out JsonElement delta))
         {
-            if (delta.TryGetProperty("reasoning_content", out JsonElement reasoningContent) && reasoningContent.ValueKind == JsonValueKind.String)
-            {
-                return reasoningContent.GetString();
-            }
-
-            if (delta.TryGetProperty("reasoning", out JsonElement reasoning) && reasoning.ValueKind == JsonValueKind.String)
-            {
-                return reasoning.GetString();
-            }
-
-            if (delta.TryGetProperty("thought", out JsonElement thought) && thought.ValueKind == JsonValueKind.String)
-            {
-                return thought.GetString();
-            }
+            return GetReasoningProperty(delta);
         }
 
         return null;
@@ -106,8 +95,8 @@ public class OpenAIClient : DelegatingChatClient
 
     internal static string? ExtractReasoningContent(OpenAI.Chat.ChatCompletion chatCompletion)
     {
-        BinaryData data = ModelReaderWriter.Write(chatCompletion);
-        using JsonDocument document = JsonDocument.Parse(data);
+        BinaryData serialisedData = ModelReaderWriter.Write(chatCompletion);
+        using JsonDocument document = JsonDocument.Parse(serialisedData);
 
         if (!document.RootElement.TryGetProperty("choices", out JsonElement choices) || choices.GetArrayLength() == 0)
         {
@@ -118,31 +107,25 @@ public class OpenAIClient : DelegatingChatClient
 
         if (firstChoice.TryGetProperty("message", out JsonElement message))
         {
-            if (message.TryGetProperty("reasoning_content", out JsonElement reasoningContent) && reasoningContent.ValueKind == JsonValueKind.String)
-            {
-                return reasoningContent.GetString();
-            }
-
-            if (message.TryGetProperty("reasoning", out JsonElement reasoning) && reasoning.ValueKind == JsonValueKind.String)
-            {
-                return reasoning.GetString();
-            }
-
-            if (message.TryGetProperty("thought", out JsonElement thought) && thought.ValueKind == JsonValueKind.String)
-            {
-                return thought.GetString();
-            }
+            return GetReasoningProperty(message);
         }
 
         return null;
     }
 
-    #endregion
+    private static string? GetReasoningProperty(JsonElement container)
+    {
+        foreach (string propertyName in _reasoningPropertyNames)
+        {
+            if (container.TryGetProperty(propertyName, out JsonElement element) && element.ValueKind == JsonValueKind.String)
+            {
+                return element.GetString();
+            }
+        }
+
+        return null;
+    }
 }
-
-#endregion
-
-#region Builder Extensions
 
 public static class ReasoningChatClientExtensions
 {
@@ -152,5 +135,3 @@ public static class ReasoningChatClientExtensions
         return builder.Use(innerClient => new OpenAIClient(innerClient));
     }
 }
-
-#endregion

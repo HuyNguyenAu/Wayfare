@@ -1,6 +1,6 @@
 namespace Wayfare.Session;
 
-public class Session : ISession
+public sealed class Session : ISession
 {
     private readonly List<HistoryNode> _history = [];
 
@@ -17,6 +17,22 @@ public class Session : ISession
     {
         ArgumentNullException.ThrowIfNull(message);
         GetActiveBranch().Turns.Add(new TurnNode(message));
+    }
+
+    public void RollbackLastTurns(int count)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        BranchNode branch = GetActiveBranch();
+        int removeCount = Math.Min(count, branch.Turns.Count);
+
+        if (removeCount > 0)
+        {
+            branch.Turns.RemoveRange(branch.Turns.Count - removeCount, removeCount);
+        }
     }
 
     public void SquashBranch(string summary, BranchStatus status)
@@ -37,9 +53,14 @@ public class Session : ISession
         Intent = intent;
     }
 
-    public SessionMessage GetLastMessage()
+    public SessionMessage? GetLastMessage()
     {
-        return GetActiveBranch().Turns[^1].Message;
+        if (_history.Count == 0 || _history[^1] is not BranchNode branch)
+        {
+            return null;
+        }
+
+        return branch.Turns.Count > 0 ? branch.Turns[^1].Message : null;
     }
 
     public SessionProgress GetProgress()

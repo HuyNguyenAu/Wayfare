@@ -2,13 +2,11 @@ namespace Wayfare.Agent;
 
 using System.Text;
 using Microsoft.Extensions.AI;
-using Wayfare.Infrastructure.AI;
 using Wayfare.Session;
-using Wayfare.Tools;
 
-public class BranchSquasher(IChatClient chatClient) : IBranchSquasher
+public sealed class BranchSquasher(IChatClient chatClient) : IBranchSquasher
 {
-    #region Public API
+    private readonly IChatClient _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
 
     public async Task<string> SquashAsync(ISession session, CancellationToken cancellationToken)
     {
@@ -23,57 +21,24 @@ public class BranchSquasher(IChatClient chatClient) : IBranchSquasher
             new ChatMessage(ChatRole.System, SquashPromptBuilder.Build()),
             new ChatMessage(ChatRole.User, BuildTraceString(activeBranch))
         ];
-        ChatResponse response = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+        ChatResponse response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
 
         return (response.Text ?? string.Empty).Trim();
     }
 
-
-    #endregion
-
-    #region Internal Trace Formatting Helpers
-
     private static string BuildTraceString(BranchNode activeBranch)
     {
         StringBuilder traceBuilder = new();
-        traceBuilder.AppendLine("Execution trace:");
+        traceBuilder.AppendLine("<trace>");
 
         foreach (TurnNode turn in activeBranch.Turns)
         {
-            switch (turn.Message)
-            {
-                case UserMessage userMessage:
-                    traceBuilder.AppendLine($"User: {userMessage.Content}");
-                    break;
-                case AssistantMessage assistantMessage:
-                    traceBuilder.AppendLine($"Assistant: {assistantMessage.Content}");
-                    break;
-                case ToolCallMessage toolCallMessage:
-                    foreach (ToolCall toolCall in toolCallMessage.ToolCalls)
-                    {
-                        traceBuilder.AppendLine($"Tool Call: {toolCall.Name}({toolCall.Arguments})");
-                    }
-                    break;
-                case ToolResultMessage toolResultMessage:
-                    foreach (ToolExecutionResult result in toolResultMessage.Results)
-                    {
-                        string content = result.Success ? result.Result : result.Error;
-                        traceBuilder.AppendLine($"Tool Result ({result.ToolName}): {content}");
-                    }
-                    break;
-            }
+            turn.Message.AppendTraceLines(traceBuilder);
         }
 
-        traceBuilder.AppendLine();
-        traceBuilder.AppendLine("Output Format:");
-        traceBuilder.AppendLine("Situation: <Context/state before starting this branch>");
-        traceBuilder.AppendLine("Task: <Specific task or goal>");
-        traceBuilder.AppendLine("Action: <Steps taken to address the task>");
-        traceBuilder.AppendLine("Result: <Concrete outcome, produced artifacts, or resolved state>");
-        traceBuilder.AppendLine("Learnings: <Discovered constraints, failed attempts, or key insights for future steps>");
+        traceBuilder.Append("</trace>");
 
         return traceBuilder.ToString();
     }
-
-    #endregion
 }
+

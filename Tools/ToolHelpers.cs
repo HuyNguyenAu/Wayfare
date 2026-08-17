@@ -2,10 +2,30 @@ namespace Wayfare.Tools;
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Wayfare.Infrastructure.Configuration;
 
-public class ToolHelpers : IToolHelpers
+public sealed class ToolHelpers : IToolHelpers
 {
     public static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private readonly HashSet<string> _excludedDirectories;
+
+    public ToolHelpers(IReadOnlyList<string> excludedDirectories)
+    {
+        ArgumentNullException.ThrowIfNull(excludedDirectories);
+        _excludedDirectories = new HashSet<string>(excludedDirectories, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public bool IsPathIgnored(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return false;
+        }
+
+        string[] segments = relativePath.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
+
+        return segments.Any(_excludedDirectories.Contains);
+    }
 
     public bool TryDeserialiseArguments<T>(string arguments, [NotNullWhen(true)] out T? deserialisedArguments, [NotNullWhen(false)] out string? errorMessage) where T : class
     {
@@ -76,6 +96,8 @@ public class ToolHelpers : IToolHelpers
 
     public void EnsureDirectoryExists(string path)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
         string? directory = Path.GetDirectoryName(path);
 
         if (!string.IsNullOrEmpty(directory))

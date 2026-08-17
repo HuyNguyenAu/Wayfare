@@ -2,12 +2,10 @@ namespace Wayfare.UI.Components;
 
 using Spectre.Console;
 
-public class ThinkingStreamRenderer
+public sealed class ThinkingStreamRenderer
 {
     private bool _isFirstChunk = true;
     private bool _hasRendered;
-
-    public bool HasRendered => _hasRendered;
 
     public void StartStream()
     {

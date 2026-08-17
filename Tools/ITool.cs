@@ -20,8 +20,6 @@ public sealed record ToolPropertySchema(
 {
     public static ToolPropertySchema String(string description) => new("string", description);
     public static ToolPropertySchema Integer(string description) => new("integer", description);
-    public static ToolPropertySchema Boolean(string description) => new("boolean", description);
-    public static ToolPropertySchema Number(string description) => new("number", description);
 }
 
 public sealed record ToolSchema(
@@ -50,7 +48,6 @@ public sealed record ToolExecutionResult(
     string DisplayMessage,
     string Result,
     string Error,
-    [property: JsonIgnore] Exception? Exception = null,
     string ToolId = "",
     string ToolName = "");
 
@@ -59,6 +56,7 @@ public interface IToolHelpers
     bool TryDeserialiseArguments<T>(string arguments, [NotNullWhen(true)] out T? deserialisedArguments, [NotNullWhen(false)] out string? errorMessage) where T : class;
     bool TryGetRequiredPath(string path, [NotNullWhen(true)] out string? resolvedPath, [NotNullWhen(false)] out string? errorMessage);
     void EnsureDirectoryExists(string filePath);
+    bool IsPathIgnored(string relativePath);
 }
 
 public interface IToolManager

@@ -13,8 +13,8 @@ public sealed class ToolAIFunction : AIFunction
     {
         ArgumentNullException.ThrowIfNull(tool);
         _tool = tool;
-        using JsonDocument doc = JsonDocument.Parse(tool.Parameters.ToBinaryData());
-        _jsonSchema = doc.RootElement.Clone();
+        using JsonDocument jsonDocument = JsonDocument.Parse(tool.Parameters.ToBinaryData());
+        _jsonSchema = jsonDocument.RootElement.Clone();
     }
 
     public override string Name => _tool.Name;
@@ -25,13 +25,22 @@ public sealed class ToolAIFunction : AIFunction
         AIFunctionArguments arguments,
         CancellationToken cancellationToken)
     {
-        string json = JsonSerializer.Serialize(arguments);
-        return await _tool.ExecuteAsync(json, cancellationToken);
+        string serializedArguments = JsonSerializer.Serialize(arguments);
+        return await _tool.ExecuteAsync(serializedArguments, cancellationToken);
     }
 }
 
 public static class ToolMapper
 {
-    public static AIFunction ToAIFunction(this ITool tool) => new ToolAIFunction(tool);
-    public static IList<AITool> ToAITools(this IReadOnlyList<ITool> tools) => [.. tools.Select(tool => tool.ToAIFunction())];
+    public static AIFunction ToAIFunction(this ITool tool)
+    {
+        ArgumentNullException.ThrowIfNull(tool);
+        return new ToolAIFunction(tool);
+    }
+
+    public static IList<AITool> ToAITools(this IReadOnlyList<ITool> tools)
+    {
+        ArgumentNullException.ThrowIfNull(tools);
+        return [.. tools.Select(tool => tool.ToAIFunction())];
+    }
 }

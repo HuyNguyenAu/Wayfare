@@ -5,13 +5,11 @@ using System.Text;
 using NTokenizers.Extensions.Spectre.Console;
 using Spectre.Console;
 
-public class MarkdownStreamRenderer
+public sealed class MarkdownStreamRenderer
 {
     private Pipe? _markdownPipe;
     private Task? _markdownTask;
     private bool _isFirstChunk = true;
-
-    public bool IsFirstChunk => _isFirstChunk;
     public bool HeaderCompleted { get; set; }
 
     public void StartStream(CancellationToken cancellationToken)
@@ -73,7 +71,7 @@ public class MarkdownStreamRenderer
                 }
                 catch (Exception)
                 {
-                    // Ignore cleanup exceptions
+                    // Ignore cleanup exceptions.
                 }
             }
 
@@ -99,7 +97,7 @@ public class MarkdownStreamRenderer
             }
             catch (Exception)
             {
-                // Ignore cleanup exceptions
+                // Ignore cleanup exceptions.
             }
         }
     }

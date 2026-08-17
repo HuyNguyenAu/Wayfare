@@ -3,12 +3,13 @@ namespace Wayfare.Tools.Implementations;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Wayfare.Infrastructure.AI;
 using Wayfare.Session;
 using Wayfare.Tools;
 
 internal sealed class InspectMilestoneTool(ISession session) : ITool
 {
+    private readonly ISession _session = session ?? throw new ArgumentNullException(nameof(session));
+
     public string Name => "inspect_milestone";
     public string DisplayName => "Inspect Milestone";
     public string Description => "Inspect details of a past milestone including all turns. Parameters: id (string, required).";
@@ -27,8 +28,8 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
 
     public Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
-        string availableIds = session.History.Count > 0 ?
-            string.Join(", ", session.History.Select(branch => branch.Id)) : "None";
+        string availableIds = _session.History.Count > 0 ?
+            string.Join(", ", _session.History.Select(branch => branch.Id)) : "None";
 
         if (string.IsNullOrWhiteSpace(arguments) || !TryParseId(arguments, out string? targetId) || string.IsNullOrWhiteSpace(targetId))
         {
@@ -41,7 +42,7 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
 
         BranchNode? matchedBranch = null;
 
-        foreach (HistoryNode node in session.History)
+        foreach (HistoryNode node in _session.History)
         {
             if (node is BranchNode branchNode && (
                 branchNode.Id.Equals(targetId, StringComparison.OrdinalIgnoreCase) ||
@@ -78,7 +79,7 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
             {
                 TurnNode turn = matchedBranch.Turns[turnIndex];
                 output.AppendLine($"--- Turn {turnIndex + 1} ---");
-                FormatTurn(turn, output);
+                turn.Message.AppendTraceLines(output);
             }
         }
 
@@ -87,35 +88,6 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
             DisplayMessage: $"Inspected milestone [{matchedBranch.Id}] ({matchedBranch.Turns.Count} turns).",
             Result: output.ToString(),
             Error: string.Empty));
-    }
-
-    private static void FormatTurn(TurnNode turn, StringBuilder builder)
-    {
-        switch (turn.Message)
-        {
-            case UserMessage userMessage:
-                builder.AppendLine($"User: {userMessage.Content}");
-                break;
-            case AssistantMessage assistantMessage:
-                builder.AppendLine($"Assistant: {assistantMessage.Content}");
-                break;
-            case ToolCallMessage toolCallMessage:
-                foreach (ToolCall toolCall in toolCallMessage.ToolCalls)
-                {
-                    builder.AppendLine($"Tool Call: {toolCall.Name}({toolCall.Arguments})");
-                }
-                break;
-            case ToolResultMessage toolResultMessage:
-                foreach (ToolExecutionResult toolResult in toolResultMessage.Results)
-                {
-                    string content = toolResult.Success ? toolResult.Result : toolResult.Error;
-                    builder.AppendLine($"Tool Result ({toolResult.ToolName}): {content}");
-                }
-                break;
-            default:
-                builder.AppendLine($"{turn.Message.GetType().Name}: {turn.Message}");
-                break;
-        }
     }
 
     private static bool TryParseId(string arguments, out string? id)

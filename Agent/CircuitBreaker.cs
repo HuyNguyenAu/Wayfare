@@ -4,19 +4,23 @@ using System.Diagnostics.CodeAnalysis;
 using Wayfare.Infrastructure.AI;
 using Wayfare.Tools;
 
-public class CircuitBreaker(int maxTurns = 15) : ICircuitBreaker
+public sealed class CircuitBreaker : ICircuitBreaker
 {
+    private readonly int _maxTurns;
     private readonly HashSet<(string ToolName, string Arguments)> _previousTurnFailedCalls = [];
     private int _currentTurn = 0;
 
-    public int MaxTurns => maxTurns;
-    public int CurrentTurn => _currentTurn;
+    public CircuitBreaker(int maxTurns = 15)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTurns);
+        _maxTurns = maxTurns;
+    }
 
     public bool TryAdvanceTurn([NotNullWhen(false)] out string? reason)
     {
-        if (++_currentTurn > maxTurns)
+        if (++_currentTurn > _maxTurns)
         {
-            reason = $"Cycle step limit of {maxTurns} turns exceeded. Finalising cycle.";
+            reason = $"Cycle step limit of {_maxTurns} turns exceeded. Finalising cycle.";
             return false;
         }
 

@@ -1,13 +1,10 @@
 namespace Wayfare.Infrastructure.Events;
 
-#region Contracts
-
 public interface IEvent;
 
 public interface IEventPublisher
 {
     void Publish(IEvent @event);
-    ValueTask PublishAsync(IEvent @event, CancellationToken cancellationToken);
 }
 
 public interface IEventBroker : IEventPublisher
@@ -16,60 +13,38 @@ public interface IEventBroker : IEventPublisher
     void Complete();
 }
 
-#endregion
+public sealed record StartupStartedEvent : IEvent;
 
-#region Startup & Agent Lifecycle Events
+public sealed record StartupCompletedEvent : IEvent;
 
-public record StartupStartedEvent : IEvent;
+public sealed record AgentStartedEvent : IEvent;
 
-public record StartupCompletedEvent : IEvent;
+public sealed record ToolCompilationStartedEvent(string ToolName) : IEvent;
 
-public record AgentStartedEvent : IEvent;
+public sealed record ToolCompilationCompletedEvent : IEvent;
 
-#endregion
+public sealed record ToolCompilationFailedEvent(string ToolName, string Error) : IEvent;
 
-#region Dynamic Tool Pipeline Events
+public sealed record ToolLoadingStartedEvent(string ToolName) : IEvent;
 
-public record ToolCompilationStartedEvent(string ToolName) : IEvent;
+public sealed record ToolLoadingCompletedEvent : IEvent;
 
-public record ToolCompilationCompletedEvent : IEvent;
+public sealed record ToolLoadingFailedEvent(string ToolName, string Error) : IEvent;
 
-public record ToolCompilationFailedEvent(string ToolName, string Error) : IEvent;
+public sealed record ToolExecutionStartedEvent(string InvocationMessage) : IEvent;
 
-public record ToolLoadingStartedEvent(string ToolName) : IEvent;
-
-public record ToolLoadingCompletedEvent : IEvent;
-
-public record ToolLoadingFailedEvent(string ToolName, string Error) : IEvent;
-
-public record ToolExecutionStartedEvent(string InvocationMessage) : IEvent;
-
-public record ToolExecutionCompletedEvent(
+public sealed record ToolExecutionCompletedEvent(
     bool Success,
-    string ToolName,
-    string DisplayMessage,
-    string Result,
-    string Error) : IEvent;
+    string DisplayMessage) : IEvent;
 
-#endregion
+public sealed record ChatRequestStartedEvent(IReadOnlyList<string> ToolNames) : IEvent;
 
-#region Chat & LLM Streaming Events
+public sealed record ChatRequestCompletedEvent : IEvent;
 
-public record ChatRequestStartedEvent(IReadOnlyList<string> ToolNames) : IEvent;
+public sealed record ThinkingChunkReceivedEvent(string Content) : IEvent;
 
-public record ChatRequestCompletedEvent : IEvent;
+public sealed record TokenChunkReceivedEvent(string Content) : IEvent;
 
-public record ThinkingChunkReceivedEvent(string Content) : IEvent;
+public sealed record SquashingBranchEvent : IEvent;
 
-public record TokenChunkReceivedEvent(string Content) : IEvent;
-
-#endregion
-
-
-#region Session & Cycle Events
-
-public record SquashingBranchEvent : IEvent;
-
-public record CycleCompletedEvent(string Objective, IReadOnlyList<string> Milestones) : IEvent;
-
-#endregion
+public sealed record CycleCompletedEvent(string Objective, IReadOnlyList<string> Milestones) : IEvent;

@@ -8,7 +8,7 @@ using Wayfare.Infrastructure.Events;
 using Wayfare.Session;
 using Wayfare.Tools;
 
-public class Orchestrator(
+public sealed class Orchestrator(
     IChatClient chatClient,
     IToolManager toolManager,
     ISessionStore sessionStore,
@@ -19,9 +19,16 @@ public class Orchestrator(
     IPivotDetector pivotDetector,
     ICircuitBreaker circuitBreaker) : IOrchestrator
 {
-    private readonly ISession _session = sessionStore.Session;
-
-    #region Pipeline Entry Point
+    private readonly IChatClient _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
+    private readonly IToolManager _toolManager = toolManager ?? throw new ArgumentNullException(nameof(toolManager));
+    private readonly ISessionStore _sessionStore = sessionStore ?? throw new ArgumentNullException(nameof(sessionStore));
+    private readonly IEventPublisher _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
+    private readonly IBranchSquasher _branchSquasher = branchSquasher ?? throw new ArgumentNullException(nameof(branchSquasher));
+    private readonly IMessagePromptBuilder _messagePromptBuilder = messagePromptBuilder ?? throw new ArgumentNullException(nameof(messagePromptBuilder));
+    private readonly IIntentResolver _intentResolver = intentResolver ?? throw new ArgumentNullException(nameof(intentResolver));
+    private readonly IPivotDetector _pivotDetector = pivotDetector ?? throw new ArgumentNullException(nameof(pivotDetector));
+    private readonly ICircuitBreaker _circuitBreaker = circuitBreaker ?? throw new ArgumentNullException(nameof(circuitBreaker));
+    private readonly ISession _session = (sessionStore ?? throw new ArgumentNullException(nameof(sessionStore))).Session;
 
     public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
     {
@@ -29,13 +36,13 @@ public class Orchestrator(
 
         await InitialiseCycleAsync(userInput, cancellationToken);
 
-        circuitBreaker.Reset();
+        _circuitBreaker.Reset();
 
         while (_session.State != SessionState.Done && !cancellationToken.IsCancellationRequested)
         {
-            if (!circuitBreaker.TryAdvanceTurn(out string? limitExceededReason))
+            if (!_circuitBreaker.TryAdvanceTurn(out string? limitExceededReason))
             {
-                eventPublisher.Publish(new ToolExecutionCompletedEvent(false, "System", "Max turns reached", string.Empty, limitExceededReason));
+                _eventPublisher.Publish(new ToolExecutionCompletedEvent(false, limitExceededReason));
                 await CompleteCycleAsync(cancellationToken);
                 break;
             }
@@ -56,25 +63,21 @@ public class Orchestrator(
         await FinaliseCycleAsync(cancellationToken);
     }
 
-    #endregion
-
-    #region Phase 1: Initialise
-
     private async Task InitialiseCycleAsync(string userInput, CancellationToken cancellationToken)
     {
-        if (pivotDetector.IsPivot(userInput) && HasActiveUnsquashedBranch(_session))
+        if (_pivotDetector.IsPivot(userInput) && HasActiveUnsquashedBranch(_session))
         {
             _session.SquashBranch($"Abandoned: {_session.Intent}. Reason: User pivoted to '{userInput}'.", BranchStatus.Abandoned);
         }
 
-        string resolvedIntent = await intentResolver.ResolveAsync(_session.Intent, userInput, cancellationToken);
+        string resolvedIntent = await _intentResolver.ResolveAsync(_session.Intent, userInput, cancellationToken);
         _session.UpdateIntent(resolvedIntent);
         _session.StartBranch();
         _session.TransitionTo(SessionState.Thinking);
 
         UserMessage userMessage = new(userInput);
         _session.AppendTurn(userMessage);
-        await sessionStore.SaveAsync(cancellationToken);
+        await _sessionStore.SaveAsync(cancellationToken);
     }
 
     private static bool HasActiveUnsquashedBranch(ISession session)
@@ -85,34 +88,30 @@ public class Orchestrator(
                branch.Turns.Count > 0;
     }
 
-    #endregion
-
-    #region Phase 2: Thinking
-
     private async Task<ThinkingPhaseResult> ExecuteThinkingPhaseAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<string> toolNames = GetPreviousToolNames();
-        eventPublisher.Publish(new ChatRequestStartedEvent(toolNames));
+        _eventPublisher.Publish(new ChatRequestStartedEvent(toolNames));
 
         StringBuilder assembledContent = new();
         Dictionary<string, ToolCallBuilder> toolCallBuilders = [];
         ChatFinishReason? finishReason = null;
         string? activeCallKey = null;
 
-        IReadOnlyList<SessionMessage> sessionMessages = messagePromptBuilder.BuildMessages(toolManager.Tools, _session.History, _session.Intent);
+        IReadOnlyList<SessionMessage> sessionMessages = _messagePromptBuilder.BuildMessages(_session.History, _session.Intent);
         List<ChatMessage> chatMessages = SessionMessageMapper.ToChatMessages(sessionMessages);
         ChatOptions chatOptions = new()
         {
-            Tools = toolManager.Tools.ToAITools()
+            Tools = _toolManager.Tools.ToAITools()
         };
 
-        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken))
+        await foreach (ChatResponseUpdate update in _chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken))
         {
             foreach (AIContent content in update.Contents)
             {
                 if (content is ReasoningContent reasoning)
                 {
-                    eventPublisher.Publish(new ThinkingChunkReceivedEvent(reasoning.Text));
+                    _eventPublisher.Publish(new ThinkingChunkReceivedEvent(reasoning.Text));
                 }
                 else if (content is FunctionCallContent functionCall)
                 {
@@ -136,11 +135,11 @@ public class Orchestrator(
 
                     if (functionCall.Arguments is not null)
                     {
-                        builder.Args = JsonSerializer.Serialize(functionCall.Arguments);
+                        builder.SerialisedArguments = JsonSerializer.Serialize(functionCall.Arguments);
                     }
-                    else if (functionCall.RawRepresentation is OpenAI.Chat.StreamingChatToolCallUpdate rawChunk && !string.IsNullOrEmpty(rawChunk.FunctionArgumentsUpdate?.ToString()))
+                    else if (functionCall.RawRepresentation is OpenAI.Chat.StreamingChatToolCallUpdate streamingToolCallChunk && !string.IsNullOrEmpty(streamingToolCallChunk.FunctionArgumentsUpdate?.ToString()))
                     {
-                        builder.RawArgs.Append(rawChunk.FunctionArgumentsUpdate.ToString());
+                        builder.RawArguments.Append(streamingToolCallChunk.FunctionArgumentsUpdate.ToString());
                     }
                 }
             }
@@ -148,7 +147,7 @@ public class Orchestrator(
             if (!string.IsNullOrEmpty(update.Text))
             {
                 assembledContent.Append(update.Text);
-                eventPublisher.Publish(new TokenChunkReceivedEvent(update.Text));
+                _eventPublisher.Publish(new TokenChunkReceivedEvent(update.Text));
             }
 
             if (update.FinishReason is not null)
@@ -157,45 +156,41 @@ public class Orchestrator(
             }
         }
 
-        eventPublisher.Publish(new ChatRequestCompletedEvent());
+        _eventPublisher.Publish(new ChatRequestCompletedEvent());
 
         AssistantMessage assistantMessage = new(assembledContent.ToString());
         _session.AppendTurn(assistantMessage);
-        await sessionStore.SaveAsync(cancellationToken);
+        await _sessionStore.SaveAsync(cancellationToken);
 
         IReadOnlyList<ToolCall> toolCalls = [.. toolCallBuilders.Values.Select(builder => new ToolCall(
             builder.ToolId.ToString(),
             builder.Name.ToString(),
-            !string.IsNullOrEmpty(builder.Args) ? builder.Args : builder.RawArgs.ToString()
+            !string.IsNullOrEmpty(builder.SerialisedArguments) ? builder.SerialisedArguments : builder.RawArguments.ToString()
         ))];
 
         return new ThinkingPhaseResult(toolCalls, finishReason);
     }
 
-    #endregion
-
-    #region Phase 3: Acting
-
     private async Task<IReadOnlyList<ToolExecutionResult>> ExecuteActingPhaseAsync(IReadOnlyList<ToolCall> toolCalls, CancellationToken cancellationToken)
     {
         _session.TransitionTo(SessionState.Acting);
         _session.AppendTurn(new ToolCallMessage(toolCalls));
-        await sessionStore.SaveAsync(cancellationToken);
+        await _sessionStore.SaveAsync(cancellationToken);
 
         IReadOnlyList<Task<ToolExecutionResult>> executionTasks = [.. toolCalls.Select(toolCall => ExecuteToolAsync(toolCall, cancellationToken))];
         ToolExecutionResult[] toolResults = await Task.WhenAll(executionTasks);
 
-        circuitBreaker.RecordResults(toolCalls, toolResults);
+        _circuitBreaker.RecordResults(toolCalls, toolResults);
 
         return toolResults;
     }
 
     private async Task<ToolExecutionResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken)
     {
-        if (circuitBreaker.TryIntercept(toolCall, out ToolExecutionResult? interceptedResult))
+        if (_circuitBreaker.TryIntercept(toolCall, out ToolExecutionResult? interceptedResult))
         {
-            eventPublisher.Publish(new ToolExecutionStartedEvent(toolCall.Arguments));
-            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolCall.Name, interceptedResult.DisplayMessage, string.Empty, interceptedResult.Error));
+            _eventPublisher.Publish(new ToolExecutionStartedEvent(toolCall.Arguments));
+            _eventPublisher.Publish(new ToolExecutionCompletedEvent(false, interceptedResult.DisplayMessage));
             return interceptedResult;
         }
 
@@ -204,15 +199,15 @@ public class Orchestrator(
 
         try
         {
-            ITool tool = toolManager.GetTool(toolName);
+            ITool tool = _toolManager.GetTool(toolName);
             string invocationMessage = tool.GetInvocationMessage(toolCall.Arguments);
 
-            eventPublisher.Publish(new ToolExecutionStartedEvent(invocationMessage));
+            _eventPublisher.Publish(new ToolExecutionStartedEvent(invocationMessage));
             started = true;
 
             ToolExecutionResult result = await tool.ExecuteAsync(toolCall.Arguments, cancellationToken);
 
-            eventPublisher.Publish(new ToolExecutionCompletedEvent(result.Success, toolName, result.DisplayMessage, result.Result, result.Error));
+            _eventPublisher.Publish(new ToolExecutionCompletedEvent(result.Success, result.DisplayMessage));
 
             return result with { ToolId = toolCall.ToolId, ToolName = toolName };
         }
@@ -221,11 +216,11 @@ public class Orchestrator(
             if (!started)
             {
                 string message = $"[{toolName}] [{toolCall.Arguments}]";
-                eventPublisher.Publish(new ToolExecutionStartedEvent(message));
+                _eventPublisher.Publish(new ToolExecutionStartedEvent(message));
             }
 
             string descriptiveError = $"Exception occurred while executing tool '{toolName}': {exception.Message}";
-            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolName, $"An error occurred: {exception.Message}", string.Empty, descriptiveError));
+            _eventPublisher.Publish(new ToolExecutionCompletedEvent(false, $"An error occurred: {exception.Message}"));
 
             return new ToolExecutionResult(
                 Success: false,
@@ -233,51 +228,53 @@ public class Orchestrator(
                 Result: string.Empty,
                 Error: descriptiveError,
                 ToolId: toolCall.ToolId,
-                ToolName: toolName,
-                Exception: exception);
+                ToolName: toolName);
         }
     }
 
-    #endregion
-
-    #region Phase 4: Observing
-
     private async Task ExecuteObservingPhaseAsync(IReadOnlyList<ToolExecutionResult> toolResults, CancellationToken cancellationToken)
     {
+        if (toolResults.Any(toolResult => !toolResult.Success))
+        {
+            _session.RollbackLastTurns(1);
+
+            string diagnostics = string.Join("\n", toolResults
+                .Where(toolResult => !toolResult.Success)
+                .Select(toolResult => $"Diagnostic: Tool '{toolResult.ToolName}' failed: {toolResult.Error}. Verify arguments or file contents and retry."));
+
+            _session.AppendTurn(new UserMessage($"<system_alert type=\"action_failed\">\n{diagnostics}\n</system_alert>"));
+            await _sessionStore.SaveAsync(cancellationToken);
+            _session.TransitionTo(SessionState.Thinking);
+
+            return;
+        }
+
         _session.TransitionTo(SessionState.Observing);
         _session.AppendTurn(new ToolResultMessage(toolResults));
-        await sessionStore.SaveAsync(cancellationToken);
+        await _sessionStore.SaveAsync(cancellationToken);
         _session.TransitionTo(SessionState.Thinking);
     }
-
-    #endregion
-
-    #region Phase 5: Finalise
 
     private async Task CompleteCycleAsync(CancellationToken cancellationToken)
     {
         _session.TransitionTo(SessionState.Done);
-        await sessionStore.SaveAsync(cancellationToken);
+        await _sessionStore.SaveAsync(cancellationToken);
     }
 
     private async Task FinaliseCycleAsync(CancellationToken cancellationToken)
     {
         _session.TransitionTo(SessionState.Idle);
 
-        eventPublisher.Publish(new SquashingBranchEvent());
+        _eventPublisher.Publish(new SquashingBranchEvent());
 
-        string summary = await branchSquasher.SquashAsync(_session, cancellationToken);
+        string summary = await _branchSquasher.SquashAsync(_session, cancellationToken);
         _session.SquashBranch(summary, BranchStatus.Completed);
         _session.UpdateIntent(string.Empty);
-        await sessionStore.SaveAsync(cancellationToken);
+        await _sessionStore.SaveAsync(cancellationToken);
 
         SessionProgress progress = _session.GetProgress();
-        eventPublisher.Publish(new CycleCompletedEvent(progress.Objective, progress.Milestones));
+        _eventPublisher.Publish(new CycleCompletedEvent(progress.Objective, progress.Milestones));
     }
-
-    #endregion
-
-    #region Helpers & Inner Types
 
     private IReadOnlyList<string> GetPreviousToolNames()
     {
@@ -308,9 +305,8 @@ public class Orchestrator(
     {
         public StringBuilder ToolId { get; } = new();
         public StringBuilder Name { get; } = new();
-        public string? Args { get; set; }
-        public StringBuilder RawArgs { get; } = new();
+        public string? SerialisedArguments { get; set; }
+        public StringBuilder RawArguments { get; } = new();
     }
-
-    #endregion
 }
+
