@@ -3,10 +3,8 @@ namespace Wayfare.Tools;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Wayfare.Core.Abstractions;
+using Wayfare.Core;
 using Wayfare.Core.Models;
-using Wayfare.Core.Models.Ast;
-using Wayfare.Core.Models.Messages;
 
 public sealed class InspectMilestoneTool(ISession session) : ITool
 {

@@ -1,16 +1,11 @@
 namespace Wayfare.Core.Prompts;
 
 using System.Text;
-using Wayfare.Core.Abstractions;
+using Wayfare.Core;
 using Wayfare.Core.Models;
-using Wayfare.Core.Models.Ast;
-using Wayfare.Core.Models.Messages;
 
 #region System Prompt Builder
 
-/// <summary>
-/// Builds system prompts including tool descriptions and operating environment context.
-/// </summary>
 public static class SystemPromptBuilder
 {
     public static string Build(IReadOnlyList<ITool> tools)
@@ -51,9 +46,6 @@ public static class SystemPromptBuilder
 
 #region Message Prompt Builder
 
-/// <summary>
-/// Assembles prompt messages for active horizon execution from session AST history.
-/// </summary>
 public class MessagePromptBuilder : IMessagePromptBuilder
 {
     public IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<ITool> tools, IReadOnlyList<HistoryNode> history, string intent)
@@ -128,9 +120,6 @@ public class MessagePromptBuilder : IMessagePromptBuilder
 
 #region Intent Prompt Builder
 
-/// <summary>
-/// Constructs prompts for intent extraction and summarisation.
-/// </summary>
 public static class IntentPromptBuilder
 {
     public static string BuildSystem()
@@ -160,9 +149,6 @@ public static class IntentPromptBuilder
 
 #region Squash Prompt Builder
 
-/// <summary>
-/// Constructs prompts for STARL branch squashing and milestone compression.
-/// </summary>
 public static class SquashPromptBuilder
 {
     public static string Build()

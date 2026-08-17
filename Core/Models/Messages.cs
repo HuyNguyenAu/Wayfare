@@ -1,12 +1,9 @@
 using System.Text.Json.Serialization;
 
-namespace Wayfare.Core.Models.Messages;
+namespace Wayfare.Core.Models;
 
 #region Base Session Message
 
-/// <summary>
-/// Polymorphic base record for all session messages.
-/// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(SystemMessage), "system")]
 [JsonDerivedType(typeof(UserMessage), "user")]

@@ -1,4 +1,4 @@
-using Wayfare.Core.Abstractions;
+using Wayfare.Core;
 using Wayfare.Core.Models;
 
 namespace Wayfare.Tools.Implementations;

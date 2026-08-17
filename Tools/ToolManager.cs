@@ -5,9 +5,7 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
-using Wayfare.Core.Abstractions;
-using Wayfare.Core.Events;
-using Wayfare.Core.Exceptions;
+using Wayfare.Core;
 
 namespace Wayfare.Tools;
 

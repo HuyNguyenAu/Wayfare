@@ -1,15 +1,9 @@
 using System.Text.Json.Serialization;
-using Wayfare.Core.Abstractions;
-using Wayfare.Core.Models.Ast;
-using Wayfare.Core.Models.Messages;
 
 namespace Wayfare.Core.Models;
 
 #region Session Enums & DTOs
 
-/// <summary>
-/// Operational states of the agent execution cycle.
-/// </summary>
 public enum SessionState
 {
     Idle,
@@ -19,9 +13,6 @@ public enum SessionState
     Done,
 }
 
-/// <summary>
-/// Lifecycle status of an AST branch.
-/// </summary>
 public enum BranchStatus
 {
     Active,
@@ -29,14 +20,8 @@ public enum BranchStatus
     Abandoned,
 }
 
-/// <summary>
-/// Summary of current objective and squashed milestones.
-/// </summary>
 public record SessionProgress(string Objective, IReadOnlyList<string> Milestones);
 
-/// <summary>
-/// Outcome of a tool execution.
-/// </summary>
 public sealed record ToolExecutionResult(
     bool Success,
     string DisplayMessage,
@@ -50,9 +35,6 @@ public sealed record ToolExecutionResult(
 
 #region Session Implementation
 
-/// <summary>
-/// Default in-memory session implementation managing history nodes.
-/// </summary>
 public class Session : ISession
 {
     private readonly List<HistoryNode> _history = [];

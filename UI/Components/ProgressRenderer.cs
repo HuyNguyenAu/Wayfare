@@ -2,9 +2,6 @@ using Spectre.Console;
 
 namespace Wayfare.UI.Components;
 
-/// <summary>
-/// Renders terminal progress, headers, and status cards adhering to Chlorophyll OS &amp; VerdantAgent v3.5 (DESIGN.md).
-/// </summary>
 public static class ProgressRenderer
 {
     public static void RenderStartupStarted()

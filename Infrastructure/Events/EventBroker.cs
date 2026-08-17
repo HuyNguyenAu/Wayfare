@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using Wayfare.Core.Abstractions;
+using Wayfare.Core;
 
 namespace Wayfare.Infrastructure.Events;
 

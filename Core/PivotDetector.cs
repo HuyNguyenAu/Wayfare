@@ -1,7 +1,5 @@
 namespace Wayfare.Core;
 
-using Wayfare.Core.Abstractions;
-
 public class PivotDetector : IPivotDetector
 {
     private static readonly string[] _pivotPhrases =

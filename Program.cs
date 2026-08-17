@@ -2,7 +2,6 @@ namespace Wayfare;
 
 using System.ClientModel;
 using Wayfare.Core;
-using Wayfare.Core.Events;
 using Wayfare.Core.Prompts;
 using Wayfare.Infrastructure.Clients;
 using Wayfare.Infrastructure.Configuration;

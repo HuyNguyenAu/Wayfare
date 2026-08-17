@@ -1,29 +1,18 @@
 using System.Diagnostics.CodeAnalysis;
 using Wayfare.Core.Models;
-using Wayfare.Core.Models.Ast;
-using Wayfare.Core.Models.Messages;
 
-namespace Wayfare.Core.Abstractions;
+namespace Wayfare.Core;
 
 #region Events & Messaging Contracts
 
-/// <summary>
-/// Marker interface for all system events.
-/// </summary>
 public interface IEvent;
 
-/// <summary>
-/// Interface for publishing events asynchronously or synchronously.
-/// </summary>
 public interface IEventPublisher
 {
     void Publish(IEvent @event);
     ValueTask PublishAsync(IEvent @event, CancellationToken cancellationToken);
 }
 
-/// <summary>
-/// Central event bus interface supporting publish/subscribe streaming.
-/// </summary>
 public interface IEventBroker : IEventPublisher
 {
     IAsyncEnumerable<IEvent> ReadAllAsync(CancellationToken cancellationToken);
@@ -34,9 +23,6 @@ public interface IEventBroker : IEventPublisher
 
 #region LLM & Model Contracts
 
-/// <summary>
-/// Client abstraction for communicating with language models.
-/// </summary>
 public interface IChatClient
 {
     IAsyncEnumerable<StreamingChatUpdate> StreamChatAsync(
@@ -54,9 +40,6 @@ public interface IChatClient
 
 #region Session & Storage Contracts
 
-/// <summary>
-/// In-memory session representation managing AST branches and state.
-/// </summary>
 public interface ISession
 {
     SessionState State { get; }
@@ -72,9 +55,6 @@ public interface ISession
     void TransitionTo(SessionState newState);
 }
 
-/// <summary>
-/// Persistent storage mechanism for session state.
-/// </summary>
 public interface ISessionStore : IAsyncDisposable
 {
     ISession Session { get; }
@@ -85,9 +65,6 @@ public interface ISessionStore : IAsyncDisposable
 
 #region Tool Contracts
 
-/// <summary>
-/// Plugin contract for executable agent tools.
-/// </summary>
 public interface ITool
 {
     string Name { get; }
@@ -98,9 +75,6 @@ public interface ITool
     Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken);
 }
 
-/// <summary>
-/// Helper utilities provided to dynamic and built-in tools.
-/// </summary>
 public interface IToolHelpers
 {
     bool TryDeserializeArguments<T>(string arguments, [NotNullWhen(true)] out T? args, [NotNullWhen(false)] out string? errorMessage) where T : class;
@@ -108,9 +82,6 @@ public interface IToolHelpers
     void EnsureDirectoryExists(string filePath);
 }
 
-/// <summary>
-/// Registry and dynamic compilation manager for tools.
-/// </summary>
 public interface IToolManager
 {
     IReadOnlyList<ITool> Tools { get; }
@@ -124,41 +95,26 @@ public interface IToolManager
 
 #region Prompt & Pipeline Contracts
 
-/// <summary>
-/// Compresses completed session branches into STARL milestones.
-/// </summary>
 public interface IBranchSquasher
 {
     Task<string> SquashAsync(ISession session, CancellationToken cancellationToken);
 }
 
-/// <summary>
-/// Constructs LLM prompt messages from session history and active intent.
-/// </summary>
 public interface IMessagePromptBuilder
 {
     IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<ITool> tools, IReadOnlyList<HistoryNode> history, string intent);
 }
 
-/// <summary>
-/// Resolves new user intents against existing session objectives.
-/// </summary>
 public interface IIntentResolver
 {
     Task<string> ResolveAsync(string currentIntent, string userInput, CancellationToken cancellationToken);
 }
 
-/// <summary>
-/// Detects topic switches or task pivots in user input.
-/// </summary>
 public interface IPivotDetector
 {
     bool IsPivot(string userInput);
 }
 
-/// <summary>
-/// Orchestrates the 5-phase agent lifecycle.
-/// </summary>
 public interface IOrchestrator
 {
     Task RunCycleAsync(string userInput, CancellationToken cancellationToken);

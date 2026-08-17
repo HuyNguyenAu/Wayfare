@@ -1,8 +1,7 @@
 using System.Runtime.CompilerServices;
 using OpenAI.Chat;
-using Wayfare.Core.Abstractions;
+using Wayfare.Core;
 using Wayfare.Core.Models;
-using Wayfare.Core.Models.Messages;
 
 namespace Wayfare.Infrastructure.Clients;
 

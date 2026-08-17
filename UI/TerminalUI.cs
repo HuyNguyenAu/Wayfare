@@ -1,9 +1,8 @@
 using System.Threading.Channels;
 using System.Text;
 using Spectre.Console;
-using Wayfare.Core.Abstractions;
-using Wayfare.Core.Events;
 using Wayfare.UI.Components;
+using Wayfare.Core;
 
 namespace Wayfare.UI;
 

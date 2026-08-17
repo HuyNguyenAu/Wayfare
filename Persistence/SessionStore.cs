@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
-using Wayfare.Core.Abstractions;
+using Wayfare.Core;
 using Wayfare.Core.Models;
 
 namespace Wayfare.Persistence;

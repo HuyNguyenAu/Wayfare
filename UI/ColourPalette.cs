@@ -3,9 +3,6 @@ using NTokenizers.Extensions.Spectre.Console.Styles;
 
 namespace Wayfare.UI;
 
-/// <summary>
-/// Solarpunk Chlorophyll OS Colour Palette &amp; Sensory Spectrum definitions (DESIGN.md Section 3).
-/// </summary>
 public static class ColourPalette
 {
     // Solarpunk TrueColour definitions (DESIGN.md Section 3.A)
@@ -30,31 +27,6 @@ public static class ColourPalette
     public const string HexClayEmber = "#8B3A2B";
     public const string HexPeatMoss = "#131D17";
 
-    // Legacy colour aliases mapped to Solarpunk palette (for backward compatibility & high contrast)
-    public static readonly Color White = MyceliumLinen;
-    public static readonly Color Green = AlgaeLumens;
-    public static readonly Color DarkGreen = LivingCanopy;
-    public static readonly Color Yellow = SunlitOchre;
-    public static readonly Color Orange = TerracottaSol;
-    public static readonly Color Blue = BiolumAzure;
-    public static readonly Color Red = ClayEmber;
-    public static readonly Color LightGrey = SporeDust;
-    public static readonly Color DarkGrey = PeatMoss;
-
-    public const string HexWhite = HexMyceliumLinen;
-    public const string HexGreen = HexAlgaeLumens;
-    public const string HexDarkGreen = HexLivingCanopy;
-    public const string HexYellow = HexSunlitOchre;
-    public const string HexOrange = HexTerracottaSol;
-    public const string HexBlue = HexBiolumAzure;
-    public const string HexRed = HexClayEmber;
-    public const string HexLightGrey = HexSporeDust;
-    public const string HexDarkGrey = HexPeatMoss;
-    public const string HexLightPeach = HexTerracottaSol;
-
-    /// <summary>
-    /// Gets the current Circadian Theme name based on time of day (DESIGN.md Section 3.B).
-    /// </summary>
     public static string GetCircadianThemeName()
     {
         TimeSpan time = DateTime.Now.TimeOfDay;

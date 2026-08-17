@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using Wayfare.Core.Abstractions;
+using Wayfare.Core;
 
 namespace Wayfare.Tools;
 

@@ -1,6 +1,4 @@
-using Wayfare.Core.Abstractions;
-
-namespace Wayfare.Core.Events;
+namespace Wayfare.Core;
 
 #region Startup & Agent Lifecycle Events
 
@@ -50,9 +48,6 @@ public record TokenChunkReceivedEvent(string Content) : IEvent;
 #region Session & Cycle Events
 
 public record SquashingBranchEvent : IEvent;
-
-// Alias for backwards compatibility
-public record SquashingBrachEvent : SquashingBranchEvent;
 
 public record CycleCompletedEvent(string Objective, IReadOnlyList<string> Milestones) : IEvent;
 

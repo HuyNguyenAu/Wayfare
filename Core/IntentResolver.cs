@@ -1,8 +1,6 @@
 namespace Wayfare.Core;
 
-using Wayfare.Core.Abstractions;
 using Wayfare.Core.Models;
-using Wayfare.Core.Models.Messages;
 using Wayfare.Core.Prompts;
 
 public class IntentResolver(IChatClient chatClient) : IIntentResolver
