@@ -17,14 +17,14 @@ internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        return toolHelpers.TryDeserializeArguments(arguments, out ReadFileArguments? args, out _)
-            ? $"[{DisplayName}] [{args.Path}] [Offset {args.Offset}] [Limit {args.Limit}]"
+        return toolHelpers.TryDeserialiseArguments(arguments, out ReadFileArguments? parsedArguments, out _)
+            ? $"[{DisplayName}] [{parsedArguments.Path}] [Offset {parsedArguments.Offset}] [Limit {parsedArguments.Limit}]"
             : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out ReadFileArguments? readFileArguments, out string? readFileArgumentsError))
+        if (!toolHelpers.TryDeserialiseArguments(arguments, out ReadFileArguments? readFileArguments, out string? readFileArgumentsError))
         {
             return new ToolExecutionResult(false, "Failed to read file due to invalid tool arguments.", string.Empty, $"Failed to read file: invalid tool arguments. Error: {readFileArgumentsError}. Usage: {{\"path\": \"<file_path>\", \"offset\": 0, \"limit\": 2000}}");
         }
@@ -52,16 +52,16 @@ internal sealed class ReadFileTool(IToolHelpers toolHelpers) : ITool
         try
         {
             string[] lines = await File.ReadAllLinesAsync(resolvedPath, cancellationToken);
-            string[] slice = [.. lines.Skip(readFileArguments.Offset).Take(readFileArguments.Limit)];
+            string[] lineSlice = [.. lines.Skip(readFileArguments.Offset).Take(readFileArguments.Limit)];
 
-            bool hasMoreLines = readFileArguments.Offset + slice.Length < lines.Length;
-            string result = $"[File: {readFileArguments.Path}, Offset: {readFileArguments.Offset}, Lines Read: {slice.Length}, Total Lines: {lines.Length}, Has More Lines: {(hasMoreLines ? "True" : "False")}]{Environment.NewLine}{string.Join(Environment.NewLine, slice)}";
+            bool hasMoreLines = readFileArguments.Offset + lineSlice.Length < lines.Length;
+            string result = $"[File: {readFileArguments.Path}, Offset: {readFileArguments.Offset}, Lines Read: {lineSlice.Length}, Total Lines: {lines.Length}, Has More Lines: {(hasMoreLines ? "True" : "False")}]{Environment.NewLine}{string.Join(Environment.NewLine, lineSlice)}";
 
-            return new ToolExecutionResult(true, $"Read {slice.Length} lines from '{readFileArguments.Path}'.", result, string.Empty);
+            return new ToolExecutionResult(true, $"Read {lineSlice.Length} lines from '{readFileArguments.Path}'.", result, string.Empty);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            return new ToolExecutionResult(false, $"An unexpected error occurred while reading file '{readFileArguments.Path}'.", string.Empty, $"Failed to read file: an unexpected error occurred. Error: {ex.Message}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while reading file '{readFileArguments.Path}'.", string.Empty, $"Failed to read file: an unexpected error occurred. Error: {exception.Message}", exception);
         }
     }
 

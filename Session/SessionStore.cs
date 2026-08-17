@@ -7,7 +7,7 @@ using System.Threading.Channels;
 
 public class SessionStore : ISessionStore
 {
-    private static readonly JsonSerializerOptions _serializerOptions = new()
+    private static readonly JsonSerializerOptions _serialiserOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -64,9 +64,9 @@ public class SessionStore : ISessionStore
             {
                 break;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                Console.Error.WriteLine($"[SessionStore] Background save failed: {ex.Message}");
+                Console.Error.WriteLine($"[SessionStore] Background save failed: {exception.Message}");
             }
         }
     }
@@ -77,7 +77,7 @@ public class SessionStore : ISessionStore
 
         lock (_session)
         {
-            json = JsonSerializer.Serialize(_session.History, _serializerOptions);
+            json = JsonSerializer.Serialize(_session.History, _serialiserOptions);
         }
 
         string tempFilePath = $"{_currentFilePath}.tmp";
@@ -104,9 +104,9 @@ public class SessionStore : ISessionStore
         {
             await WriteSessionToFileAsync(CancellationToken.None);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Console.Error.WriteLine($"[SessionStore] Final save failed during disposal: {ex.Message}");
+            Console.Error.WriteLine($"[SessionStore] Final save failed during disposal: {exception.Message}");
         }
 
         _cancellationTokenSource.Dispose();

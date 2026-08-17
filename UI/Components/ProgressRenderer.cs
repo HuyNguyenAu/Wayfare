@@ -115,9 +115,9 @@ public static class ProgressRenderer
         grid.AddRow(new Markup($"[{ColourPalette.HexTerracottaSol} bold]⑂ BIOSPHERE DIRECTIVE:[/] [{ColourPalette.HexMyceliumLinen}]{Markup.Escape(objective)}[/]"));
         grid.AddRow(new Markup($"[{ColourPalette.HexBiolumAzure} bold]{Markup.Escape($"❦ HARVESTED MILESTONES [{milestones.Count} CYCLES]:")}[/]"));
 
-        for (int i = 0; i < milestones.Count; i++)
+        for (int milestoneIndex = 0; milestoneIndex < milestones.Count; milestoneIndex++)
         {
-            grid.AddRow(new Markup($"  [{ColourPalette.HexAlgaeLumens}]❦[/] [{ColourPalette.HexTerracottaSol}]NODE-{i + 1:D2}[/] [{ColourPalette.HexSporeDust}]{Markup.Escape(milestones[i].Trim())}[/]"));
+            grid.AddRow(new Markup($"  [{ColourPalette.HexAlgaeLumens}]❦[/] [{ColourPalette.HexTerracottaSol}]NODE-{milestoneIndex + 1:D2}[/] [{ColourPalette.HexSporeDust}]{Markup.Escape(milestones[milestoneIndex].Trim())}[/]"));
         }
 
         AnsiConsole.Write(grid);

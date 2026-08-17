@@ -56,7 +56,7 @@ public sealed record ToolExecutionResult(
 
 public interface IToolHelpers
 {
-    bool TryDeserializeArguments<T>(string arguments, [NotNullWhen(true)] out T? args, [NotNullWhen(false)] out string? errorMessage) where T : class;
+    bool TryDeserialiseArguments<T>(string arguments, [NotNullWhen(true)] out T? deserialisedArguments, [NotNullWhen(false)] out string? errorMessage) where T : class;
     bool TryGetRequiredPath(string path, [NotNullWhen(true)] out string? resolvedPath, [NotNullWhen(false)] out string? errorMessage);
     void EnsureDirectoryExists(string filePath);
 }

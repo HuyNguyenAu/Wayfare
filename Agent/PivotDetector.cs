@@ -64,11 +64,11 @@ public class PivotDetector : IPivotDetector
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userInput);
 
-        string lower = userInput.ToLowerInvariant().Trim();
+        string lowercasedInput = userInput.ToLowerInvariant().Trim();
 
         foreach (string phrase in _pivotPhrases)
         {
-            if (lower.Contains(phrase, StringComparison.OrdinalIgnoreCase))
+            if (lowercasedInput.Contains(phrase, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
@@ -76,9 +76,9 @@ public class PivotDetector : IPivotDetector
 
         foreach (string prefix in _leadingPivotPrefixes)
         {
-            if (lower.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            if (lowercasedInput.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
-                string remainder = lower[prefix.Length..].TrimStart();
+                string remainder = lowercasedInput[prefix.Length..].TrimStart();
                 if (remainder.StartsWith("let's", StringComparison.OrdinalIgnoreCase) ||
                     remainder.StartsWith("lets", StringComparison.OrdinalIgnoreCase) ||
                     remainder.StartsWith("do", StringComparison.OrdinalIgnoreCase) ||

@@ -16,14 +16,14 @@ internal sealed class FindTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        return toolHelpers.TryDeserializeArguments(arguments, out FindArguments? args, out _)
-            ? $"[{DisplayName}] [{(string.IsNullOrWhiteSpace(args.Path) ? "." : args.Path)}] [{args.Pattern}]"
+        return toolHelpers.TryDeserialiseArguments(arguments, out FindArguments? parsedArguments, out _)
+            ? $"[{DisplayName}] [{(string.IsNullOrWhiteSpace(parsedArguments.Path) ? "." : parsedArguments.Path)}] [{parsedArguments.Pattern}]"
             : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out FindArguments? findArguments, out string? findArgumentsError))
+        if (!toolHelpers.TryDeserialiseArguments(arguments, out FindArguments? findArguments, out string? findArgumentsError))
         {
             return new ToolExecutionResult(false, "Failed to search due to invalid tool arguments.", string.Empty, $"Failed to search: invalid tool arguments. Error: {findArgumentsError}. Usage: {{\"path\": \".\", \"pattern\": \"<search_pattern>\"}}");
         }
@@ -67,9 +67,9 @@ internal sealed class FindTool(IToolHelpers toolHelpers) : ITool
             string result = $"Found {matches.Count} match(es) for pattern '{findArguments.Pattern}' in '{searchPath}':{Environment.NewLine}{string.Join(Environment.NewLine, matches)}";
             return new ToolExecutionResult(true, $"Found {matches.Count} match(es) for '{findArguments.Pattern}' in '{searchPath}'.", result, string.Empty);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            return new ToolExecutionResult(false, $"An unexpected error occurred while searching in '{resolvedPath}'.", string.Empty, $"Failed to search: an unexpected error occurred. Error: {ex.Message}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while searching in '{resolvedPath}'.", string.Empty, $"Failed to search: an unexpected error occurred. Error: {exception.Message}", exception);
         }
     }
 

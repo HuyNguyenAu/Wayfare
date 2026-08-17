@@ -58,7 +58,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         {
             await _eventLoopTask;
         }
-        catch (Exception ex) when (ex is OperationCanceledException or ChannelClosedException)
+        catch (Exception exception) when (exception is OperationCanceledException or ChannelClosedException)
         {
             // Expected completion / cancellation
         }
@@ -73,13 +73,13 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
                 await HandleEventAsync(@event, cancellationToken);
             }
         }
-        catch (Exception ex) when (ex is OperationCanceledException or ChannelClosedException)
+        catch (Exception exception) when (exception is OperationCanceledException or ChannelClosedException)
         {
             // Shutdown expected
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            AnsiConsole.MarkupLine($"[{ColourPalette.HexClayEmber}]⚠ UI Event Processing Error: {Markup.Escape(ex.Message)}[/]");
+            AnsiConsole.MarkupLine($"[{ColourPalette.HexClayEmber}]⚠ UI Event Processing Error: {Markup.Escape(exception.Message)}[/]");
         }
         finally
         {
@@ -111,49 +111,49 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
                 ProgressRenderer.RenderStartAgent();
                 _agentReadyTaskCompletionSource.TrySetResult();
                 break;
-            case ToolCompilationStartedEvent e:
+            case ToolCompilationStartedEvent toolCompilationStartedEvent:
                 EnsureToolsHeaderRendered();
-                ProgressRenderer.RenderToolCompilationStarted(e.ToolName);
+                ProgressRenderer.RenderToolCompilationStarted(toolCompilationStartedEvent.ToolName);
                 break;
             case ToolCompilationCompletedEvent:
                 ProgressRenderer.RenderToolCompilationCompleted();
                 break;
-            case ToolCompilationFailedEvent e:
+            case ToolCompilationFailedEvent toolCompilationFailedEvent:
                 EnsureToolsHeaderRendered();
-                ProgressRenderer.RenderToolCompilationFailed(e.ToolName, e.Error);
+                ProgressRenderer.RenderToolCompilationFailed(toolCompilationFailedEvent.ToolName, toolCompilationFailedEvent.Error);
                 break;
-            case ToolLoadingStartedEvent e:
+            case ToolLoadingStartedEvent toolLoadingStartedEvent:
                 EnsureToolsHeaderRendered();
-                ProgressRenderer.RenderToolLoadingStarted(e.ToolName);
+                ProgressRenderer.RenderToolLoadingStarted(toolLoadingStartedEvent.ToolName);
                 break;
             case ToolLoadingCompletedEvent:
                 ProgressRenderer.RenderToolLoadingCompleted();
                 break;
-            case ToolLoadingFailedEvent e:
+            case ToolLoadingFailedEvent toolLoadingFailedEvent:
                 EnsureToolsHeaderRendered();
-                ProgressRenderer.RenderToolLoadingFailed(e.ToolName, e.Error);
+                ProgressRenderer.RenderToolLoadingFailed(toolLoadingFailedEvent.ToolName, toolLoadingFailedEvent.Error);
                 break;
-            case ChatRequestStartedEvent e:
-                ProgressRenderer.RenderChatRequestStarted(e.ToolNames);
+            case ChatRequestStartedEvent chatRequestStartedEvent:
+                ProgressRenderer.RenderChatRequestStarted(chatRequestStartedEvent.ToolNames);
                 _markdownStreamRenderer.StartStream(cancellationToken);
                 break;
             case ChatRequestCompletedEvent:
                 await _markdownStreamRenderer.CompleteStreamAsync();
                 break;
-            case TokenChunkReceivedEvent e:
-                await _markdownStreamRenderer.AppendChunkAsync(e.Content, cancellationToken);
+            case TokenChunkReceivedEvent tokenChunkReceivedEvent:
+                await _markdownStreamRenderer.AppendChunkAsync(tokenChunkReceivedEvent.Content, cancellationToken);
                 break;
-            case ToolExecutionStartedEvent e:
-                ProgressRenderer.RenderToolExecutionStarted(e.InvocationMessage);
+            case ToolExecutionStartedEvent toolExecutionStartedEvent:
+                ProgressRenderer.RenderToolExecutionStarted(toolExecutionStartedEvent.InvocationMessage);
                 break;
-            case ToolExecutionCompletedEvent e:
-                ProgressRenderer.RenderToolExecutionCompleted(e.Success, e.DisplayMessage);
+            case ToolExecutionCompletedEvent toolExecutionCompletedEvent:
+                ProgressRenderer.RenderToolExecutionCompleted(toolExecutionCompletedEvent.Success, toolExecutionCompletedEvent.DisplayMessage);
                 break;
             case SquashingBranchEvent:
                 ProgressRenderer.RenderSquashingBranch();
                 break;
-            case CycleCompletedEvent e:
-                ProgressRenderer.RenderObjectiveAndMilestones(e.Objective, e.Milestones);
+            case CycleCompletedEvent cycleCompletedEvent:
+                ProgressRenderer.RenderObjectiveAndMilestones(cycleCompletedEvent.Objective, cycleCompletedEvent.Milestones);
                 break;
         }
     }
@@ -176,7 +176,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         {
             await _eventLoopTask;
         }
-        catch (Exception ex) when (ex is OperationCanceledException or ChannelClosedException)
+        catch (Exception exception) when (exception is OperationCanceledException or ChannelClosedException)
         {
             // Ignore task cancellation
         }

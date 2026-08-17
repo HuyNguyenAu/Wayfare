@@ -16,8 +16,8 @@ public class IntentResolver(IChatClient chatClient) : IIntentResolver
         ];
 
         ChatCompletionResult response = await chatClient.CompleteChatAsync(messages, [], cancellationToken);
-        string trimmed = response.Content.Trim();
+        string resolvedIntent = response.Content.Trim();
 
-        return !string.IsNullOrWhiteSpace(trimmed) ? trimmed : userInput.Trim();
+        return !string.IsNullOrWhiteSpace(resolvedIntent) ? resolvedIntent : userInput.Trim();
     }
 }

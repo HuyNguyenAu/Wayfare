@@ -74,10 +74,10 @@ public sealed class InspectMilestoneTool(ISession session) : ITool
         }
         else
         {
-            for (int i = 0; i < matchedBranch.Turns.Count; i++)
+            for (int turnIndex = 0; turnIndex < matchedBranch.Turns.Count; turnIndex++)
             {
-                TurnNode turn = matchedBranch.Turns[i];
-                output.AppendLine($"--- Turn {i + 1} ---");
+                TurnNode turn = matchedBranch.Turns[turnIndex];
+                output.AppendLine($"--- Turn {turnIndex + 1} ---");
                 FormatTurn(turn, output);
             }
         }
@@ -100,16 +100,16 @@ public sealed class InspectMilestoneTool(ISession session) : ITool
                 builder.AppendLine($"Assistant: {assistantMessage.Content}");
                 break;
             case ToolCallMessage toolCallMessage:
-                foreach (ToolCall call in toolCallMessage.ToolCalls)
+                foreach (ToolCall toolCall in toolCallMessage.ToolCalls)
                 {
-                    builder.AppendLine($"Tool Call: {call.Name}({call.Arguments})");
+                    builder.AppendLine($"Tool Call: {toolCall.Name}({toolCall.Arguments})");
                 }
                 break;
             case ToolResultMessage toolResultMessage:
-                foreach (ToolExecutionResult result in toolResultMessage.Results)
+                foreach (ToolExecutionResult toolResult in toolResultMessage.Results)
                 {
-                    string content = result.Success ? result.Result : result.Error;
-                    builder.AppendLine($"Tool Result ({result.ToolName}): {content}");
+                    string content = toolResult.Success ? toolResult.Result : toolResult.Error;
+                    builder.AppendLine($"Tool Result ({toolResult.ToolName}): {content}");
                 }
                 break;
             default:
@@ -122,8 +122,8 @@ public sealed class InspectMilestoneTool(ISession session) : ITool
     {
         try
         {
-            InspectMilestoneArguments? args = JsonSerializer.Deserialize<InspectMilestoneArguments>(arguments, ToolHelpers.JsonOptions);
-            id = args?.Id;
+            InspectMilestoneArguments? parsedArguments = JsonSerializer.Deserialize<InspectMilestoneArguments>(arguments, ToolHelpers.JsonOptions);
+            id = parsedArguments?.Id;
             return !string.IsNullOrWhiteSpace(id);
         }
         catch

@@ -7,38 +7,38 @@ public class ToolHelpers : IToolHelpers
 {
     public static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public bool TryDeserializeArguments<T>(string arguments, [NotNullWhen(true)] out T? args, [NotNullWhen(false)] out string? errorMessage) where T : class
+    public bool TryDeserialiseArguments<T>(string arguments, [NotNullWhen(true)] out T? deserialisedArguments, [NotNullWhen(false)] out string? errorMessage) where T : class
     {
         ArgumentNullException.ThrowIfNull(arguments);
 
         try
         {
-            T? result = JsonSerializer.Deserialize<T>(arguments, JsonOptions);
+            T? parsedObject = JsonSerializer.Deserialize<T>(arguments, JsonOptions);
 
-            if (result is null)
+            if (parsedObject is null)
             {
-                args = null;
+                deserialisedArguments = null;
                 errorMessage = "Arguments are missing. Provide the required parameters as JSON.";
 
                 return false;
             }
 
-            args = result;
+            deserialisedArguments = parsedObject;
             errorMessage = null;
 
             return true;
         }
         catch (JsonException)
         {
-            args = default;
+            deserialisedArguments = default;
             errorMessage = "Arguments are not valid JSON.";
 
             return false;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            args = default;
-            errorMessage = $"Failed to parse arguments: {ex}";
+            deserialisedArguments = default;
+            errorMessage = $"Failed to parse arguments: {exception.Message}";
 
             return false;
         }

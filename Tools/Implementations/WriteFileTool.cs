@@ -16,14 +16,14 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        return toolHelpers.TryDeserializeArguments(arguments, out WriteFileArguments? args, out _)
-            ? $"[{DisplayName}] [{args.Path}]"
+        return toolHelpers.TryDeserialiseArguments(arguments, out WriteFileArguments? parsedArguments, out _)
+            ? $"[{DisplayName}] [{parsedArguments.Path}]"
             : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out WriteFileArguments? writeFileArguments, out string? writeFileArgumentsError))
+        if (!toolHelpers.TryDeserialiseArguments(arguments, out WriteFileArguments? writeFileArguments, out string? writeFileArgumentsError))
         {
             return new ToolExecutionResult(false, "Failed to write file due to invalid tool arguments.", string.Empty, $"Failed to write file: invalid tool arguments. Error: {writeFileArgumentsError}. Usage: {{\"path\": \"<file_path>\", \"content\": \"<file_content>\"}}");
         }
@@ -41,9 +41,9 @@ internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
 
             return new ToolExecutionResult(true, $"Successfully wrote content to file '{writeFileArguments.Path}'.", $"Successfully wrote all content to file '{writeFileArguments.Path}'.", string.Empty);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            return new ToolExecutionResult(false, $"An unexpected error occurred while writing to file '{writeFileArguments.Path}'.", string.Empty, $"Failed to write file: an unexpected error occurred. Error: {ex.Message}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while writing to file '{writeFileArguments.Path}'.", string.Empty, $"Failed to write file: an unexpected error occurred. Error: {exception.Message}", exception);
         }
     }
 

@@ -28,7 +28,7 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
 
     public ITool GetTool(string name)
     {
-        ITool? tool = Tools.FirstOrDefault(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+        ITool? tool = Tools.FirstOrDefault(toolCandidate => toolCandidate.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"No tool found with name '{name}'");
 
         return tool;
@@ -59,9 +59,9 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
         {
             toolFilePaths = Directory.GetFiles(directoryPath, searchPattern);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or PathTooLongException or DirectoryNotFoundException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or PathTooLongException or DirectoryNotFoundException)
         {
-            throw new LoadToolException($"Failed to access tool directory '{directoryPath}' with search pattern '{searchPattern}'", ex);
+            throw new LoadToolException($"Failed to access tool directory '{directoryPath}' with search pattern '{searchPattern}'", exception);
         }
 
         HashSet<string> activeToolNames = toolFilePaths
@@ -83,9 +83,9 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
                     {
                         File.Delete(dllFilePath);
                     }
-                    catch (Exception ex)
+                    catch (Exception exception)
                     {
-                        throw new LoadToolException($"Failed to delete stale compiled tool '{dllFilePath}' for tool '{toolName}'", ex);
+                        throw new LoadToolException($"Failed to delete stale compiled tool '{dllFilePath}' for tool '{toolName}'", exception);
                     }
                 }
             }
@@ -111,11 +111,11 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
                     await CompileToolAsync(toolFilePath, dllPath, cancellationToken);
                     eventPublisher.Publish(new ToolCompilationCompletedEvent());
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    errors.Add(ex);
+                    errors.Add(exception);
 
-                    eventPublisher.Publish(new ToolCompilationFailedEvent(toolName, ex.Message));
+                    eventPublisher.Publish(new ToolCompilationFailedEvent(toolName, exception.Message));
 
                     if (File.Exists(dllPath))
                     {
@@ -147,10 +147,10 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
 
                 eventPublisher.Publish(new ToolLoadingCompletedEvent());
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                errors.Add(ex);
-                eventPublisher.Publish(new ToolLoadingFailedEvent(toolName, ex.Message));
+                errors.Add(exception);
+                eventPublisher.Publish(new ToolLoadingFailedEvent(toolName, exception.Message));
             }
         }
 
@@ -215,9 +215,9 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
             {
                 references.Add(MetadataReference.CreateFromFile(location));
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                throw new LoadToolException($"Failed to create metadata reference from '{location}'", ex);
+                throw new LoadToolException($"Failed to create metadata reference from '{location}'", exception);
             }
         }
 
@@ -254,26 +254,26 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
 
     private static ITool LoadTool(string toolPath)
     {
-        IToolHelpers helpers = new ToolHelpers();
+        IToolHelpers toolHelpers = new ToolHelpers();
 
         try
         {
             using FileStream toolFileStream = new(toolPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             Assembly assembly = AssemblyLoadContext.Default.LoadFromStream(toolFileStream);
 
-            Type toolType = assembly.GetTypes().FirstOrDefault(t => typeof(ITool).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
+            Type toolType = assembly.GetTypes().FirstOrDefault(typeCandidate => typeof(ITool).IsAssignableFrom(typeCandidate) && !typeCandidate.IsInterface && !typeCandidate.IsAbstract)
                 ?? throw new LoadToolException($"No valid implementation of ITool found in assembly '{toolPath}'.");
 
-            if (Activator.CreateInstance(toolType, helpers) is not ITool toolInstance)
+            if (Activator.CreateInstance(toolType, toolHelpers) is not ITool toolInstance)
             {
                 throw new LoadToolException($"Failed to load tool from '{toolPath}' because the type '{toolType.FullName}' does not implement ITool or could not be instantiated.");
             }
 
             return toolInstance;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException or ReflectionTypeLoadException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or BadImageFormatException or ReflectionTypeLoadException)
         {
-            throw new LoadToolException($"Failed to load tool from '{toolPath}'", ex);
+            throw new LoadToolException($"Failed to load tool from '{toolPath}'", exception);
         }
     }
 

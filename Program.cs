@@ -72,9 +72,9 @@ public class Program
         catch (OperationCanceledException)
         {
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Console.Error.WriteLine($"An error occurred: {ex.Message}");
+            Console.Error.WriteLine($"An error occurred: {exception.Message}");
         }
         finally
         {

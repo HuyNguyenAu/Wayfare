@@ -17,14 +17,14 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        return toolHelpers.TryDeserializeArguments(arguments, out ReplaceArguments? args, out _)
-            ? $"[{DisplayName}] [{args.Path}] [Old \"{args.OldText}\"] [New \"{args.NewText}\"]"
+        return toolHelpers.TryDeserialiseArguments(arguments, out ReplaceArguments? parsedArguments, out _)
+            ? $"[{DisplayName}] [{parsedArguments.Path}] [Old \"{parsedArguments.OldText}\"] [New \"{parsedArguments.NewText}\"]"
             : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out ReplaceArguments? replaceArguments, out string? replaceArgumentsError))
+        if (!toolHelpers.TryDeserialiseArguments(arguments, out ReplaceArguments? replaceArguments, out string? replaceArgumentsError))
         {
             return new ToolExecutionResult(false, "Failed to replace text due to invalid tool arguments.", string.Empty, $"Failed to replace text: invalid tool arguments. Error: {replaceArgumentsError}. Usage: {{\"path\": \"<file_path>\", \"oldText\": \"<exact_snippet>\", \"newText\": \"<replacement>\"}}");
         }
@@ -49,34 +49,34 @@ internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
             string content = await File.ReadAllTextAsync(resolvedPath, cancellationToken);
             bool hasCrlf = content.Contains("\r\n");
 
-            string normalizedContent = content.Replace("\r\n", "\n");
-            string normalizedOldText = replaceArguments.OldText.Replace("\r\n", "\n");
-            string normalizedNewText = replaceArguments.NewText.Replace("\r\n", "\n");
+            string normalisedContent = content.Replace("\r\n", "\n");
+            string normalisedOldText = replaceArguments.OldText.Replace("\r\n", "\n");
+            string normalisedNewText = replaceArguments.NewText.Replace("\r\n", "\n");
 
-            int index = normalizedContent.IndexOf(normalizedOldText, StringComparison.Ordinal);
+            int matchIndex = normalisedContent.IndexOf(normalisedOldText, StringComparison.Ordinal);
 
-            if (index == -1)
+            if (matchIndex == -1)
             {
                 return new ToolExecutionResult(false, $"Failed to replace text: target text not found in '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: 'oldText' was not found in '{replaceArguments.Path}' (0 matches found). The search block must match the file content exactly, including all indentation and whitespace. Use 'read' to inspect the exact current file content before retrying.");
             }
 
-            int lastIndex = normalizedContent.LastIndexOf(normalizedOldText, StringComparison.Ordinal);
+            int lastMatchIndex = normalisedContent.LastIndexOf(normalisedOldText, StringComparison.Ordinal);
 
-            if (index != lastIndex)
+            if (matchIndex != lastMatchIndex)
             {
                 return new ToolExecutionResult(false, $"Failed to replace text: target text is not unique in '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: 'oldText' matches multiple locations in '{replaceArguments.Path}'. Please include more surrounding lines/context above or below the target block to make the search string unique.");
             }
 
-            string replacedContent = normalizedContent.Remove(index, normalizedOldText.Length).Insert(index, normalizedNewText);
+            string replacedContent = normalisedContent.Remove(matchIndex, normalisedOldText.Length).Insert(matchIndex, normalisedNewText);
             string finalContent = hasCrlf ? replacedContent.Replace("\r\n", "\n").Replace("\n", "\r\n") : replacedContent;
 
             await File.WriteAllTextAsync(resolvedPath, finalContent, cancellationToken);
 
             return new ToolExecutionResult(true, $"Successfully replaced text in '{replaceArguments.Path}'.", $"Successfully replaced text block in file '{replaceArguments.Path}'.", string.Empty);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            return new ToolExecutionResult(false, $"An unexpected error occurred while replacing text in '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: an unexpected error occurred. Error: {ex.Message}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while replacing text in '{replaceArguments.Path}'.", string.Empty, $"Failed to replace text: an unexpected error occurred. Error: {exception.Message}", exception);
         }
     }
 

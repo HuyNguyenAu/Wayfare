@@ -17,14 +17,14 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        return toolHelpers.TryDeserializeArguments(arguments, out ExecuteCommandArguments? args, out _)
-            ? $"[{DisplayName}] [{args.Command} {args.Arguments}]".TrimEnd()
+        return toolHelpers.TryDeserialiseArguments(arguments, out ExecuteCommandArguments? commandArguments, out _)
+            ? $"[{DisplayName}] [{commandArguments.Command} {commandArguments.Arguments}]".TrimEnd()
             : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out ExecuteCommandArguments? executeCommandArguments, out string? executeCommandArgumentsError))
+        if (!toolHelpers.TryDeserialiseArguments(arguments, out ExecuteCommandArguments? executeCommandArguments, out string? executeCommandArgumentsError))
         {
             return new ToolExecutionResult(false, "Failed to execute command due to invalid tool arguments.", string.Empty, $"Failed to execute command: invalid tool arguments. Error: {executeCommandArgumentsError}. Usage: {{\"command\": \"<executable>\", \"arguments\": \"<optional args>\"}}");
         }
@@ -53,17 +53,17 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
                 return new ToolExecutionResult(false, $"Failed to start command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: process could not be started for '{executeCommandArguments.Command}'. Verify that the executable exists and is available on PATH.");
             }
 
-            using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            linkedCts.CancelAfter(TimeSpan.FromSeconds(45));
+            using CancellationTokenSource linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            linkedCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(45));
 
-            Task<string> outputTask = process.StandardOutput.ReadToEndAsync(linkedCts.Token);
-            Task<string> errorTask = process.StandardError.ReadToEndAsync(linkedCts.Token);
+            Task<string> outputTask = process.StandardOutput.ReadToEndAsync(linkedCancellationTokenSource.Token);
+            Task<string> errorTask = process.StandardError.ReadToEndAsync(linkedCancellationTokenSource.Token);
 
             try
             {
-                await process.WaitForExitAsync(linkedCts.Token);
+                await process.WaitForExitAsync(linkedCancellationTokenSource.Token);
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && linkedCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && linkedCancellationTokenSource.IsCancellationRequested)
             {
                 try
                 {
@@ -74,12 +74,12 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
                     // Best-effort cleanup.
                 }
 
-                string cmdDesc = $"{executeCommandArguments.Command} {executeCommandArguments.Arguments}".Trim();
+                string commandDescription = $"{executeCommandArguments.Command} {executeCommandArguments.Arguments}".Trim();
                 return new ToolExecutionResult(
                     false,
                     $"Command '{executeCommandArguments.Command}' timed out after 45 seconds.",
                     string.Empty,
-                    $"Failed to execute command: command '{cmdDesc}' timed out after 45 seconds and was terminated. Consider running a more specific subcommand, reducing workload, or breaking the task down.");
+                    $"Failed to execute command: command '{commandDescription}' timed out after 45 seconds and was terminated. Consider running a more specific subcommand, reducing workload, or breaking the task down.");
             }
             catch (OperationCanceledException)
             {
@@ -107,23 +107,23 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 
             return new ToolExecutionResult(success, displayMessage, result, errorMessage);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            return new ToolExecutionResult(false, $"An unexpected error occurred while executing command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: an unexpected error occurred. Error: {ex.Message}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while executing command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: an unexpected error occurred. Error: {exception.Message}", exception);
         }
     }
 
-    internal static string TruncateOutput(string output, int maxChars = 6000)
+    internal static string TruncateOutput(string output, int maxCharacters = 6000)
     {
-        if (string.IsNullOrEmpty(output) || output.Length <= maxChars)
+        if (string.IsNullOrEmpty(output) || output.Length <= maxCharacters)
         {
             return output;
         }
 
-        int half = maxChars / 2;
-        int headLength = half;
-        int tailLength = half;
-        int truncatedCount = output.Length - maxChars;
+        int halfLength = maxCharacters / 2;
+        int headLength = halfLength;
+        int tailLength = halfLength;
+        int truncatedCount = output.Length - maxCharacters;
 
         return $"{output[..headLength]}{Environment.NewLine}{Environment.NewLine}[... TRUNCATED {truncatedCount} CHARACTERS ...]{Environment.NewLine}{Environment.NewLine}{output[^tailLength..]}";
     }

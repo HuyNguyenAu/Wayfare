@@ -90,11 +90,11 @@ public class MessagePromptBuilder : IMessagePromptBuilder
         trunk.AppendLine();
         trunk.AppendLine("Milestones:");
 
-        for (int i = 0; i < history.Count - 1; i++)
+        for (int milestoneIndex = 0; milestoneIndex < history.Count - 1; milestoneIndex++)
         {
-            BranchNode branch = (BranchNode)history[i];
+            BranchNode branch = (BranchNode)history[milestoneIndex];
             string statusTag = branch.Status == BranchStatus.Abandoned ? " [Abandoned]" : string.Empty;
-            trunk.AppendLine($"{i + 1}. [{branch.Id}]{statusTag}: {branch.Summary}");
+            trunk.AppendLine($"{milestoneIndex + 1}. [{branch.Id}]{statusTag}: {branch.Summary}");
         }
 
         trunk.AppendLine();

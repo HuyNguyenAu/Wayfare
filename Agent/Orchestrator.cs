@@ -193,7 +193,7 @@ public class Orchestrator(
 
             return result with { ToolId = toolCall.ToolId, ToolName = toolName };
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
             if (!started)
             {
@@ -201,17 +201,17 @@ public class Orchestrator(
                 eventPublisher.Publish(new ToolExecutionStartedEvent(message));
             }
 
-            string descriptiveError = $"Exception occurred while executing tool '{toolName}': {ex.Message}";
-            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolName, $"An error occurred: {ex.Message}", string.Empty, descriptiveError));
+            string descriptiveError = $"Exception occurred while executing tool '{toolName}': {exception.Message}";
+            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolName, $"An error occurred: {exception.Message}", string.Empty, descriptiveError));
 
             return new ToolExecutionResult(
                 Success: false,
-                DisplayMessage: $"An error occurred: {ex.Message}",
+                DisplayMessage: $"An error occurred: {exception.Message}",
                 Result: string.Empty,
                 Error: descriptiveError,
                 ToolId: toolCall.ToolId,
                 ToolName: toolName,
-                Exception: ex);
+                Exception: exception);
         }
     }
 
@@ -260,14 +260,14 @@ public class Orchestrator(
     {
         if (_session.GetLastMessage() is ToolResultMessage previousToolResultMessage)
         {
-            List<string> names = new(previousToolResultMessage.Results.Count);
+            List<string> previousToolNames = new(previousToolResultMessage.Results.Count);
 
-            for (int i = 0; i < previousToolResultMessage.Results.Count; i++)
+            for (int resultIndex = 0; resultIndex < previousToolResultMessage.Results.Count; resultIndex++)
             {
-                names.Add(previousToolResultMessage.Results[i].ToolName);
+                previousToolNames.Add(previousToolResultMessage.Results[resultIndex].ToolName);
             }
 
-            return names;
+            return previousToolNames;
         }
 
         return [];

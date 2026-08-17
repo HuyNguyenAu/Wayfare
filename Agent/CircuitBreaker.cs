@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using Wayfare.Infrastructure.AI;
 using Wayfare.Tools;
 
-public class CircuitBreaker(int maxTurns) : ICircuitBreaker
+public class CircuitBreaker(int maxTurns = 15) : ICircuitBreaker
 {
     private readonly HashSet<(string ToolName, string Arguments)> _previousTurnFailedCalls = [];
     private int _currentTurn = 0;
@@ -54,13 +54,13 @@ public class CircuitBreaker(int maxTurns) : ICircuitBreaker
 
         _previousTurnFailedCalls.Clear();
 
-        int count = Math.Min(toolCalls.Count, results.Count);
+        int resultCount = Math.Min(toolCalls.Count, results.Count);
 
-        for (int i = 0; i < count; i++)
+        for (int resultIndex = 0; resultIndex < resultCount; resultIndex++)
         {
-            if (!results[i].Success)
+            if (!results[resultIndex].Success)
             {
-                _previousTurnFailedCalls.Add((toolCalls[i].Name, toolCalls[i].Arguments));
+                _previousTurnFailedCalls.Add((toolCalls[resultIndex].Name, toolCalls[resultIndex].Arguments));
             }
         }
     }

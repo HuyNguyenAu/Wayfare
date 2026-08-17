@@ -8,7 +8,7 @@ This document outlines the core architectural principles, design patterns, and c
 
 Wayfare is designed around five foundational qualities:
 
-1. **High Navigability & Feature Slicing**: A developer inspecting the codebase for the first time should understand the overall application lifecycle in under 30 seconds. Components are organized into clear domain slices (`Session/`, `Agent/`, `Tools/`, `Infrastructure/`, `UI/`).
+1. **High Navigability & Feature Slicing**: A developer inspecting the codebase for the first time should understand the overall application lifecycle in under 30 seconds. Components are organised into clear domain slices (`Session/`, `Agent/`, `Tools/`, `Infrastructure/`, `UI/`).
 2. **Composition Over Inheritance**: Data structures use flat polymorphic records (algebraic discriminated unions), and services compose focused collaborator strategies without deep class inheritance trees.
 3. **100% Unit Testability**: Clean abstraction seams at I/O and external boundaries (`IChatClient`, `ISessionStore`, `IEventPublisher`, `IToolManager`, `IToolHelpers`) allow complete testing without real network, file system, or process invocations.
 4. **Early Boundary Guards**: Public entry points validate inputs and state upfront, guaranteeing that internal methods execute in a valid state.

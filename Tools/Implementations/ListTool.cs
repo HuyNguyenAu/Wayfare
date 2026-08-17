@@ -15,14 +15,14 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
 
     public string GetInvocationMessage(string arguments)
     {
-        return toolHelpers.TryDeserializeArguments(arguments, out ListFilesArguments? args, out _)
-            ? $"[{DisplayName}] [{args.Path}]"
+        return toolHelpers.TryDeserialiseArguments(arguments, out ListFilesArguments? parsedArguments, out _)
+            ? $"[{DisplayName}] [{parsedArguments.Path}]"
             : $"[{DisplayName}] [{arguments}]";
     }
 
     public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out ListFilesArguments? listArguments, out string? listArgumentsError))
+        if (!toolHelpers.TryDeserialiseArguments(arguments, out ListFilesArguments? listArguments, out string? listArgumentsError))
         {
             return new ToolExecutionResult(false, "Failed to list directory due to invalid tool arguments.", string.Empty, $"Failed to list directory: invalid tool arguments. Error: {listArgumentsError}. Usage: {{\"path\": \"<directory_path>\"}}");
         }
@@ -62,9 +62,9 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
 
             return new ToolExecutionResult(true, $"Listed {matches.Count} entries in '{listArguments.Path}'.", result, string.Empty);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            return new ToolExecutionResult(false, $"An unexpected error occurred while listing directory '{listArguments.Path}'.", string.Empty, $"Failed to list directory: an unexpected error occurred. Error: {ex.Message}", ex);
+            return new ToolExecutionResult(false, $"An unexpected error occurred while listing directory '{listArguments.Path}'.", string.Empty, $"Failed to list directory: an unexpected error occurred. Error: {exception.Message}", exception);
         }
     }
 

@@ -47,9 +47,9 @@ public sealed record Settings
             return defaultValue;
         }
 
-        if (int.TryParse(value, out int result) && result > 0)
+        if (int.TryParse(value, out int parsedInt) && parsedInt > 0)
         {
-            return result;
+            return parsedInt;
         }
 
         throw new InvalidOperationException($"Environment variable '{key}' must be a positive integer.");
