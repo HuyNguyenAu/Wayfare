@@ -27,7 +27,7 @@ public interface IPivotDetector
 
 public interface IMessagePromptBuilder
 {
-    IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<HistoryNode> history, string intent);
+    IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<HistoryNode> history);
 }
 
 public interface ICircuitBreaker

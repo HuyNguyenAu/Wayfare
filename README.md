@@ -25,10 +25,7 @@ graph TD
    - [`BranchNode`](Session/SessionModels.cs): Active working branch representing live tool execution turns and squashed milestone summaries.
    - [`TurnNode`](Session/SessionModels.cs): Leaf node wrapping discrete domain messages (`UserMessage`, `AssistantMessage`, `ToolCallMessage`, `ToolResultMessage`).
 
-2. **Small-Model (7B–32B) Context Engineering ([`Agent/Prompts.cs`](Agent/Prompts.cs) & [`Agent/Orchestrator.cs`](Agent/Orchestrator.cs)):**
-   - **Dynamic Observation Tombstoning**: In-memory compaction keeps only the last 2 `ToolResultMessage` turns fully expanded. Superseded historical observations are dynamically compacted into `<observation tool="..." status="tombstoned" ... />` to preserve attention span without corrupting raw session logs.
-   - **Asymmetric Failure Quarantine**: When a tool execution fails, the invalid `ToolCallMessage` turn is rolled back via `RollbackLastTurns(1)` and replaced by a single diagnostic `<system_alert type="action_failed">` `UserMessage`, preventing autoregressive hallucination loops.
-   - **Recency Inversion via State Board**: Injects a compact `<state_board>` block immediately before the final inference turn to eliminate "lost-in-the-middle" goal degradation.
+2. **Context Engineering ([`Agent/Prompts.cs`](Agent/Prompts.cs)):**
    - **Positive XML Framing**: Replaces fragile negative prompt constraints with structured XML boundary markers (`<goal>`, `<milestone_summary>`, `<observation>`).
 
 3. **Branch Squashing ([`Agent/BranchSquasher.cs`](Agent/BranchSquasher.cs) & [`Agent/Prompts.cs`](Agent/Prompts.cs)):**
@@ -125,7 +122,6 @@ TOOLS_PATH=/home/dev/Wayfare/Tools/Implementations
 COMPILED_DIRECTORY=/home/dev/Wayfare/compiled
 SESSIONS_DIRECTORY=/home/dev/Wayfare/sessions
 MAX_TURNS=15
-MAX_ACTIVE_OBSERVATIONS_TO_RETAIN=2
 EXCLUDED_DIRECTORIES=.git,bin,obj,node_modules,.vs
 ```
 
@@ -138,7 +134,6 @@ EXCLUDED_DIRECTORIES=.git,bin,obj,node_modules,.vs
 | `COMPILED_DIRECTORY` | Yes | — | Directory path for cached Roslyn compiled tool DLLs. |
 | `SESSIONS_DIRECTORY` | Yes | — | Directory path where session AST logs are persisted. |
 | `MAX_TURNS` | No | `15` | Maximum ReAct loop iterations per user turn before circuit breaker triggers. |
-| `MAX_ACTIVE_OBSERVATIONS_TO_RETAIN` | No | `2` | Number of recent tool observation turns to retain in full before tombstoning. |
 | `EXCLUDED_DIRECTORIES` | No | `.git,bin,obj,node_modules,.vs` | Comma- or semicolon-separated directory names to ignore during file searches and path traversal. |
 
 ---

@@ -11,7 +11,6 @@ public sealed record Settings
     public required string CompiledDirectory { get; init; }
     public required string SessionsDirectory { get; init; }
     public int MaxTurns { get; init; } = 15;
-    public int MaxActiveObservationsToRetain { get; init; } = 2;
     public IReadOnlyList<string> ExcludedDirectories { get; init; } = DefaultExcludedDirectories;
 
     public static Settings FromEnvironment()
@@ -27,7 +26,6 @@ public sealed record Settings
             CompiledDirectory = GetValue("COMPILED_DIRECTORY"),
             SessionsDirectory = GetValue("SESSIONS_DIRECTORY"),
             MaxTurns = GetOptionalInt("MAX_TURNS", 15),
-            MaxActiveObservationsToRetain = GetOptionalInt("MAX_ACTIVE_OBSERVATIONS_TO_RETAIN", 2, allowZero: true),
             ExcludedDirectories = GetOptionalStringList("EXCLUDED_DIRECTORIES", DefaultExcludedDirectories)
         };
     }

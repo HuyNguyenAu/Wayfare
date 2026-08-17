@@ -2,7 +2,6 @@ namespace Wayfare.Agent;
 
 using System.Text;
 using Wayfare.Session;
-using Wayfare.Tools;
 
 public static class SystemPromptBuilder
 {
@@ -26,18 +25,9 @@ public static class SystemPromptBuilder
 
 public sealed class MessagePromptBuilder : IMessagePromptBuilder
 {
-    private readonly int _maxActiveObservationsToRetain;
-
-    public MessagePromptBuilder(int maxActiveObservationsToRetain)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(maxActiveObservationsToRetain);
-        _maxActiveObservationsToRetain = maxActiveObservationsToRetain;
-    }
-
-    public IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<HistoryNode> history, string intent)
+    public IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<HistoryNode> history)
     {
         ArgumentNullException.ThrowIfNull(history);
-        ArgumentNullException.ThrowIfNull(intent);
 
         if (history.Count == 0 || history[^1] is not BranchNode activeBranch)
         {
@@ -48,48 +38,10 @@ public sealed class MessagePromptBuilder : IMessagePromptBuilder
             new SystemMessage(SystemPromptBuilder.Build())
         ];
 
-        List<TurnNode> turns = activeBranch.Turns;
-
-        List<int> toolResultIndices = [];
-
-        for (int turnIndex = 0; turnIndex < turns.Count; turnIndex++)
+        foreach (TurnNode turn in activeBranch.Turns)
         {
-            if (turns[turnIndex].Message is ToolResultMessage)
-            {
-                toolResultIndices.Add(turnIndex);
-            }
+            messages.Add(turn.Message);
         }
-
-        HashSet<int> indicesToTombstone = [.. toolResultIndices.Take(Math.Max(0, toolResultIndices.Count - _maxActiveObservationsToRetain))];
-
-        for (int turnIndex = 0; turnIndex < turns.Count; turnIndex++)
-        {
-            SessionMessage turnMessage = turns[turnIndex].Message;
-
-            if (indicesToTombstone.Contains(turnIndex) && turnMessage is ToolResultMessage toolResultMessage)
-            {
-                List<ToolExecutionResult> compactResults = [.. toolResultMessage.Results.Select(result => result with
-                {
-                    Result = $"<observation tool=\"{result.ToolName}\" status=\"tombstoned\">[Historical output compacted]</observation>",
-                    DisplayMessage = "[Compacted historical observation]"
-                })];
-
-                messages.Add(new ToolResultMessage(compactResults));
-            }
-            else
-            {
-                messages.Add(turnMessage);
-            }
-        }
-
-        string stateBoard = $"""
-        <state_board>
-        Active Goal: {(string.IsNullOrWhiteSpace(intent) ? "Complete user task" : intent)}
-        Working Directory: {Directory.GetCurrentDirectory()}
-        </state_board>
-        """;
-
-        messages.Add(new UserMessage(stateBoard));
 
         return messages.AsReadOnly();
     }

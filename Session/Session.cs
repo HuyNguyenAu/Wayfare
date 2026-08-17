@@ -19,22 +19,6 @@ public sealed class Session : ISession
         GetActiveBranch().Turns.Add(new TurnNode(message));
     }
 
-    public void RollbackLastTurns(int count)
-    {
-        if (count <= 0)
-        {
-            return;
-        }
-
-        BranchNode branch = GetActiveBranch();
-        int removeCount = Math.Min(count, branch.Turns.Count);
-
-        if (removeCount > 0)
-        {
-            branch.Turns.RemoveRange(branch.Turns.Count - removeCount, removeCount);
-        }
-    }
-
     public void SquashBranch(string summary, BranchStatus status)
     {
         ArgumentNullException.ThrowIfNull(summary);

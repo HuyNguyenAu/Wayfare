@@ -72,7 +72,7 @@ public static class Program
         eventBroker.Publish(new AgentStartedEvent());
 
         BranchSquasher branchSquasher = new(chatClient);
-        MessagePromptBuilder messagePromptBuilder = new(settings.MaxActiveObservationsToRetain);
+        MessagePromptBuilder messagePromptBuilder = new();
         IntentResolver intentResolver = new(chatClient);
         PivotDetector pivotDetector = new();
         CircuitBreaker circuitBreaker = new(settings.MaxTurns);

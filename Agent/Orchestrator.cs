@@ -98,7 +98,7 @@ public sealed class Orchestrator(
         ChatFinishReason? finishReason = null;
         string? activeCallKey = null;
 
-        IReadOnlyList<SessionMessage> sessionMessages = _messagePromptBuilder.BuildMessages(_session.History, _session.Intent);
+        IReadOnlyList<SessionMessage> sessionMessages = _messagePromptBuilder.BuildMessages(_session.History);
         List<ChatMessage> chatMessages = SessionMessageMapper.ToChatMessages(sessionMessages);
         ChatOptions chatOptions = new()
         {
@@ -116,6 +116,7 @@ public sealed class Orchestrator(
                 else if (content is FunctionCallContent functionCall)
                 {
                     string key = !string.IsNullOrEmpty(functionCall.CallId) ? functionCall.CallId : (activeCallKey ?? Guid.NewGuid().ToString());
+
                     if (!toolCallBuilders.TryGetValue(key, out ToolCallBuilder? builder))
                     {
                         builder = new ToolCallBuilder();
@@ -234,21 +235,6 @@ public sealed class Orchestrator(
 
     private async Task ExecuteObservingPhaseAsync(IReadOnlyList<ToolExecutionResult> toolResults, CancellationToken cancellationToken)
     {
-        if (toolResults.Any(toolResult => !toolResult.Success))
-        {
-            _session.RollbackLastTurns(1);
-
-            string diagnostics = string.Join("\n", toolResults
-                .Where(toolResult => !toolResult.Success)
-                .Select(toolResult => $"Diagnostic: Tool '{toolResult.ToolName}' failed: {toolResult.Error}. Verify arguments or file contents and retry."));
-
-            _session.AppendTurn(new UserMessage($"<system_alert type=\"action_failed\">\n{diagnostics}\n</system_alert>"));
-            await _sessionStore.SaveAsync(cancellationToken);
-            _session.TransitionTo(SessionState.Thinking);
-
-            return;
-        }
-
         _session.TransitionTo(SessionState.Observing);
         _session.AppendTurn(new ToolResultMessage(toolResults));
         await _sessionStore.SaveAsync(cancellationToken);

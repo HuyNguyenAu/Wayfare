@@ -14,7 +14,7 @@ Wayfare/
 ├── Agent/                             // 5-stage loop, prompt builder, intent resolution
 │   ├── Orchestrator.cs                // Core agent execution cycle
 │   ├── IntentResolver.cs              // Goal extraction & active intent tracking
-│   ├── Prompts.cs                     // Message prompt builder & compaction
+│   ├── Prompts.cs                     // Message prompt builder & prompt templates
 │   └── CircuitBreaker.cs              // Loop detection & repetition guards
 ├── Session/                           // Linear turn history, state, and persistence
 │   ├── ISession.cs                    // Session contracts and turn management
@@ -66,8 +66,7 @@ Every turn in the agent execution loop proceeds through a strictly linear 5-stag
                    ▼
     ┌─────────────────────────────┐
     │         4. OBSERVE          │
-    │ (Success: Append to turns)  │
-    │ (Failure: Rollback & alert) │
+    │   Record tool observations  │
     └──────────────┬──────────────┘
                    │
                    └─────────── Loop back to (2. THINK)
@@ -80,9 +79,9 @@ Every turn in the agent execution loop proceeds through a strictly linear 5-stag
 | Stage | Focus | Key Operations |
 | :--- | :--- | :--- |
 | **1. Initialise** | Context Setup | Ingest user message, extract active `<goal>` tags via `IntentResolver`, and initialise the turn state. |
-| **2. Think** | LLM Inference | Construct prompt via `MessagePromptBuilder`, compact historical observations to stay within token budgets, append `<state_board>` at the recency boundary, and stream tokens via `IChatClient`. |
+| **2. Think** | LLM Inference | Construct prompt via `MessagePromptBuilder` and stream tokens via `IChatClient`. |
 | **3. Act** | Tool Dispatch | Resolve requested tools via `ToolManager` and execute tools using safe `IToolHelpers` boundaries. |
-| **4. Observe** | Feedback Loop | **On Success**: Append tool observation records and loop back to **Think**.<br/>**On Failure**: Roll back the failing model turn and inject a clean error alert to prevent autoregressive hallucination loops. |
+| **4. Observe** | Feedback Loop | Append tool observation records to turn history and loop back to **Think**. |
 | **5. Finalise** | Completion | Compress completed turns into milestone summary, persist session state to disk asynchronously, and emit `CycleCompletedEvent`. |
 
 ---

@@ -79,6 +79,7 @@ public sealed class PivotDetector : IPivotDetector
             if (lowercasedInput.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
                 string remainder = lowercasedInput[prefix.Length..].TrimStart();
+
                 if (remainder.StartsWith("let's", StringComparison.OrdinalIgnoreCase) ||
                     remainder.StartsWith("lets", StringComparison.OrdinalIgnoreCase) ||
                     remainder.StartsWith("do", StringComparison.OrdinalIgnoreCase) ||
