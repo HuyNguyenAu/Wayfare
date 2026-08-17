@@ -1,4 +1,22 @@
-namespace Wayfare.Core;
+namespace Wayfare.Infrastructure.Events;
+
+#region Contracts
+
+public interface IEvent;
+
+public interface IEventPublisher
+{
+    void Publish(IEvent @event);
+    ValueTask PublishAsync(IEvent @event, CancellationToken cancellationToken);
+}
+
+public interface IEventBroker : IEventPublisher
+{
+    IAsyncEnumerable<IEvent> ReadAllAsync(CancellationToken cancellationToken);
+    void Complete();
+}
+
+#endregion
 
 #region Startup & Agent Lifecycle Events
 

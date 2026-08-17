@@ -1,7 +1,6 @@
-using System.Threading.Channels;
-using Wayfare.Core;
-
 namespace Wayfare.Infrastructure.Events;
+
+using System.Threading.Channels;
 
 public sealed class EventBroker : IEventBroker
 {

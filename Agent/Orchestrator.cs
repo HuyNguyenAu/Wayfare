@@ -1,7 +1,10 @@
-namespace Wayfare.Core;
+namespace Wayfare.Agent;
 
 using System.Text;
-using Wayfare.Core.Models;
+using Wayfare.Infrastructure.AI;
+using Wayfare.Infrastructure.Events;
+using Wayfare.Session;
+using Wayfare.Tools;
 
 public class Orchestrator(
     IChatClient chatClient,

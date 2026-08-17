@@ -1,39 +1,4 @@
-using System.Text.Json.Serialization;
-
-namespace Wayfare.Core.Models;
-
-#region Session Enums & DTOs
-
-public enum SessionState
-{
-    Idle,
-    Thinking,
-    Acting,
-    Observing,
-    Done,
-}
-
-public enum BranchStatus
-{
-    Active,
-    Completed,
-    Abandoned,
-}
-
-public record SessionProgress(string Objective, IReadOnlyList<string> Milestones);
-
-public sealed record ToolExecutionResult(
-    bool Success,
-    string DisplayMessage,
-    string Result,
-    string Error,
-    [property: JsonIgnore] Exception? Exception = null,
-    string ToolId = "",
-    string ToolName = "");
-
-#endregion
-
-#region Session Implementation
+namespace Wayfare.Session;
 
 public class Session : ISession
 {
@@ -105,5 +70,3 @@ public class Session : ISession
         return branchNode;
     }
 }
-
-#endregion

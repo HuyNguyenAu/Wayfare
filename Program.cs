@@ -1,13 +1,13 @@
 namespace Wayfare;
 
 using System.ClientModel;
-using Wayfare.Core;
-using Wayfare.Core.Prompts;
+using Wayfare.Agent;
 using Wayfare.Infrastructure.Clients;
 using Wayfare.Infrastructure.Configuration;
 using Wayfare.Infrastructure.Events;
-using Wayfare.Persistence;
+using Wayfare.Session;
 using Wayfare.Tools;
+using Wayfare.Tools.Implementations;
 using Wayfare.UI;
 
 public class Program

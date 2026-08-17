@@ -1,7 +1,7 @@
-namespace Wayfare.Core;
+namespace Wayfare.Agent;
 
-using Wayfare.Core.Models;
-using Wayfare.Core.Prompts;
+using Wayfare.Infrastructure.AI;
+using Wayfare.Session;
 
 public class IntentResolver(IChatClient chatClient) : IIntentResolver
 {

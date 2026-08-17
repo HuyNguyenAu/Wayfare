@@ -1,8 +1,8 @@
-namespace Wayfare.Core.Prompts;
+namespace Wayfare.Agent;
 
 using System.Text;
-using Wayfare.Core;
-using Wayfare.Core.Models;
+using Wayfare.Session;
+using Wayfare.Tools;
 
 #region System Prompt Builder
 

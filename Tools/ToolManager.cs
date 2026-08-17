@@ -1,3 +1,5 @@
+namespace Wayfare.Tools;
+
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -5,9 +7,9 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
-using Wayfare.Core;
+using Wayfare.Infrastructure.Events;
 
-namespace Wayfare.Tools;
+public class LoadToolException(string message, Exception? innerException = null) : Exception(message, innerException);
 
 public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> builtInTools) : IToolManager
 {
@@ -168,10 +170,8 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
             "using System.Threading.Tasks;",
             "using System.Text.Json;",
             "using System.Text.Json.Serialization;",
-            "using Wayfare.Core.Abstractions;",
-            "using Wayfare.Core.Models;",
-            "using Wayfare.Core.Models.Ast;",
             "using Wayfare.Tools;",
+            "using Wayfare.Session;",
         ];
         string sourceWithUsings = $"{string.Join(Environment.NewLine, usings)}{Environment.NewLine}{sourceCode}";
         string assemblyDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location)
@@ -185,7 +185,7 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
             typeof(Enumerable).Assembly.Location,
             typeof(ITool).Assembly.Location,
             typeof(ToolHelpers).Assembly.Location,
-            typeof(Wayfare.Core.Models.ToolExecutionResult).Assembly.Location,
+            typeof(ToolExecutionResult).Assembly.Location,
             typeof(System.Text.Json.JsonSerializer).Assembly.Location,
             typeof(System.Text.Json.Serialization.JsonPropertyNameAttribute).Assembly.Location,
             typeof(Process).Assembly.Location,

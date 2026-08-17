@@ -1,10 +1,11 @@
-namespace Wayfare.Tools;
+namespace Wayfare.Tools.Implementations;
 
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Wayfare.Core;
-using Wayfare.Core.Models;
+using Wayfare.Infrastructure.AI;
+using Wayfare.Session;
+using Wayfare.Tools;
 
 public sealed class InspectMilestoneTool(ISession session) : ITool
 {

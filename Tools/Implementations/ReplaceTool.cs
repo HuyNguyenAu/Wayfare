@@ -1,7 +1,6 @@
-using Wayfare.Core;
-using Wayfare.Core.Models;
-
 namespace Wayfare.Tools.Implementations;
+
+using Wayfare.Tools;
 
 internal sealed class ReplaceTool(IToolHelpers toolHelpers) : ITool
 {

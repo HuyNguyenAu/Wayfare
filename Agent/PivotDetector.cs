@@ -1,4 +1,4 @@
-namespace Wayfare.Core;
+namespace Wayfare.Agent;
 
 public class PivotDetector : IPivotDetector
 {

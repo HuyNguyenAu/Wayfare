@@ -1,8 +1,7 @@
-using System.Diagnostics;
-using Wayfare.Core;
-using Wayfare.Core.Models;
-
 namespace Wayfare.Tools.Implementations;
+
+using System.Diagnostics;
+using Wayfare.Tools;
 
 internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 {

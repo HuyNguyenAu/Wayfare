@@ -1,4 +1,4 @@
-namespace Wayfare.Core.Models;
+namespace Wayfare.Infrastructure.AI;
 
 #region Enums & Tool Invocation
 

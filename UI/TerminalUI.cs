@@ -1,16 +1,10 @@
-using System.Threading.Channels;
-using System.Text;
-using Spectre.Console;
-using Wayfare.UI.Components;
-using Wayfare.Core;
-
 namespace Wayfare.UI;
 
-public interface ITerminalUI
-{
-    Task<string> GetUserInputAsync(CancellationToken cancellationToken);
-    Task WaitForCompletionAsync();
-}
+using System.Text;
+using System.Threading.Channels;
+using Spectre.Console;
+using Wayfare.Infrastructure.Events;
+using Wayfare.UI.Components;
 
 public class TerminalUI : ITerminalUI, IAsyncDisposable
 {

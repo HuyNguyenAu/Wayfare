@@ -1,9 +1,10 @@
+namespace Wayfare.Infrastructure.Clients;
+
 using System.Runtime.CompilerServices;
 using OpenAI.Chat;
-using Wayfare.Core;
-using Wayfare.Core.Models;
-
-namespace Wayfare.Infrastructure.Clients;
+using Wayfare.Infrastructure.AI;
+using Wayfare.Session;
+using Wayfare.Tools;
 
 public class OpenAIClient(ChatClient client) : IChatClient
 {

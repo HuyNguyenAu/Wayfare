@@ -1,8 +1,7 @@
+namespace Wayfare.Tools;
+
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using Wayfare.Core;
-
-namespace Wayfare.Tools;
 
 public class ToolHelpers : IToolHelpers
 {

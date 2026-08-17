@@ -6,12 +6,13 @@ This document outlines the core architectural principles, design patterns, and c
 
 ## 1. Core Engineering Philosophy
 
-Wayfare is designed around four foundational qualities:
+Wayfare is designed around five foundational qualities:
 
-1. **High Navigability**: A developer inspecting the codebase for the first time should understand the overall application lifecycle in under 30 seconds.
-2. **Single-Responsibility Phases**: Each phase in a workflow operates as a pure data transformation without tight coupling to adjacent phases.
-3. **Early Boundary Guards**: Public entry points validate inputs and state upfront, guaranteeing that internal methods execute in a valid state.
-4. **Zero-Noise Internal Helpers**: Private helper methods perform direct, focused tasks without repetitive defensive assertions or redundant null checks.
+1. **High Navigability & Feature Slicing**: A developer inspecting the codebase for the first time should understand the overall application lifecycle in under 30 seconds. Components are organized into clear domain slices (`Session/`, `Agent/`, `Tools/`, `Infrastructure/`, `UI/`).
+2. **Composition Over Inheritance**: Data structures use flat polymorphic records (algebraic discriminated unions), and services compose focused collaborator strategies without deep class inheritance trees.
+3. **100% Unit Testability**: Clean abstraction seams at I/O and external boundaries (`IChatClient`, `ISessionStore`, `IEventPublisher`, `IToolManager`, `IToolHelpers`) allow complete testing without real network, file system, or process invocations.
+4. **Early Boundary Guards**: Public entry points validate inputs and state upfront, guaranteeing that internal methods execute in a valid state.
+5. **Zero-Noise Internal Helpers**: Private helper methods perform direct, focused tasks without repetitive defensive assertions or redundant null checks.
 
 ---
 
@@ -40,7 +41,56 @@ graph TD
 
 ---
 
-## 3. Early Boundary Guards Pattern
+## 3. Solution Structure
+
+```
+Wayfare/
+├── Program.cs                                 // Composition root & top-level REPL loop
+├── Infrastructure/
+│   ├── Configuration/Settings.cs              // Environment configuration & validation
+│   ├── AI/                                    // Chat streaming & completion contracts/models
+│   │   ├── IChatClient.cs
+│   │   └── ChatModels.cs
+│   ├── Clients/OpenAIClient.cs                // OpenAI SDK adapter
+│   └── Events/                                // Channel-based event broker & event records
+│       ├── Events.cs
+│       └── EventBroker.cs
+├── Session/                                   // In-memory AST, turns, and async disk persistence
+│   ├── ISession.cs
+│   ├── Session.cs
+│   ├── SessionModels.cs
+│   └── SessionStore.cs
+├── Tools/                                     // Dynamic Roslyn compiler & built-in tool plugins
+│   ├── ITool.cs
+│   ├── ToolManager.cs
+│   ├── ToolHelpers.cs
+│   └── Implementations/
+│       ├── InspectMilestoneTool.cs
+│       ├── ExecuteCommandTool.cs
+│       ├── FindTool.cs
+│       ├── ListTool.cs
+│       ├── ReadFileTool.cs
+│       ├── ReplaceTool.cs
+│       └── WriteFileTool.cs
+├── Agent/                                     // 5-phase orchestration pipeline & prompt builders
+│   ├── AgentContracts.cs
+│   ├── Orchestrator.cs
+│   ├── IntentResolver.cs
+│   ├── PivotDetector.cs
+│   ├── BranchSquasher.cs
+│   └── Prompts.cs
+└── UI/                                        // Solarpunk terminal interface & Spectre renderers
+    ├── ITerminalUI.cs
+    ├── TerminalUI.cs
+    ├── ColourPalette.cs
+    └── Components/
+        ├── MarkdownStreamRenderer.cs
+        └── ProgressRenderer.cs
+```
+
+---
+
+## 4. Early Boundary Guards Pattern
 
 Place all argument validation and state invariant checks as far up the call stack as possible—at public API entry points.
 
@@ -50,38 +100,9 @@ Place all argument validation and state invariant checks as far up the call stac
 - Throw explicit exceptions (`InvalidOperationException`, `ArgumentException`) immediately when preconditions are violated.
 - Never let invalid states pass by quietly or fail silently.
 
-### Example: Public Boundary Guard
-
-```csharp
-public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
-{
-    // Early guard check at entry point
-    ArgumentException.ThrowIfNullOrWhiteSpace(userInput);
-
-    await InitialiseCycleAsync(userInput, cancellationToken);
-    // ...
-}
-```
-
-```csharp
-public IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<ITool> tools, IReadOnlyList<HistoryNode> history)
-{
-    // Early guard checks at entry point
-    ArgumentNullException.ThrowIfNull(tools);
-    ArgumentNullException.ThrowIfNull(history);
-
-    if (history.Count == 0 || history[^1] is not BranchNode activeBranch)
-    {
-        throw new InvalidOperationException($"Session history must contain at least one {nameof(BranchNode)}.");
-    }
-    
-    // ...
-}
-```
-
 ---
 
-## 4. Zero-Noise Helper Methods
+## 5. Zero-Noise Helper Methods
 
 Because public boundary methods guarantee valid state, private internal helpers should assume valid invariants.
 
@@ -91,33 +112,9 @@ Because public boundary methods guarantee valid state, private internal helpers 
 - Avoid repeating defensive checks (`if (obj != null)` or type assertions) inside helpers when upper layers already validated them.
 - Use C# pattern-matching expressions and LINQ for clear, declarative transformations.
 
-### Example: Zero-Noise Helper
-
-```csharp
-// Assumes history[0] and history[^1] are valid BranchNodes (guaranteed by BuildMessages entry guard)
-private static string BuildLinearTrunk(IReadOnlyList<HistoryNode> history)
-{
-    BranchNode firstBranch = (BranchNode)history[0];
-    UserMessage firstUserMessage = (UserMessage)firstBranch.Turns[0].Message;
-
-    StringBuilder trunk = new();
-    trunk.AppendLine($"Objective: {firstUserMessage.Content}");
-    trunk.AppendLine("\nMilestones:");
-
-    for (int i = 0; i < history.Count - 1; i++)
-    {
-        BranchNode branch = (BranchNode)history[i];
-        trunk.AppendLine($"{i + 1}. [{branch.Id}]: {branch.Summary}");
-    }
-
-    trunk.AppendLine("\nNote: Past turns are squashed into milestones.");
-    return trunk.ToString();
-}
-```
-
 ---
 
-## 5. Null Safety & Error Reporting Standards
+## 6. Null Safety & Error Reporting Standards
 
 ### Null Safety Rules
 
@@ -130,22 +127,9 @@ private static string BuildLinearTrunk(IReadOnlyList<HistoryNode> history)
 - **Fail-Fast Startup**: If application configuration (`Settings`) or tool loading (`ToolManager`) fails during startup, print detailed diagnostic messages to `Console.Error` and exit immediately with a non-zero exit code.
 - **Never Pass Quietly**: Never swallow exceptions silently or return dummy fallback values when an invalid state occurs.
 
-```csharp
-// Program.cs startup error handler
-if (toolManager.Errors.Count > 0)
-{
-    foreach (Exception error in toolManager.Errors)
-    {
-        Console.Error.WriteLine($"Tool initialisation failed: {error.Message}");
-    }
-    Environment.ExitCode = 1;
-    return;
-}
-```
-
 ---
 
-## 6. Dynamic Tool Engineering (`ITool`)
+## 7. Dynamic Tool Engineering (`ITool`)
 
 Tools in Wayfare are self-contained plugins implementing `ITool`.
 
@@ -154,47 +138,3 @@ Tools in Wayfare are self-contained plugins implementing `ITool`.
 1. **Sealed Classes**: Implement tools as `internal sealed class ToolName(IToolHelpers toolHelpers) : ITool`.
 2. **Safe Invocation Messages**: `GetInvocationMessage(string arguments)` must be non-throwing. Format display arguments safely using null-coalescing defaults if argument parsing fails.
 3. **Structured Results**: Return clean `ToolExecutionResult` instances indicating success, display messages, output strings, and explicit error details.
-
-### Example Tool Implementation
-
-```csharp
-internal sealed class WriteFileTool(IToolHelpers toolHelpers) : ITool
-{
-    public string Name => "write";
-    public string DisplayName => "Write";
-    public string Description => "Write content to a file. Parameters: path (string, required), content (string, required).";
-
-    public string GetInvocationMessage(string arguments)
-    {
-        return toolHelpers.TryDeserializeArguments(arguments, out WriteFileArguments? args, out _)
-            ? $"[{DisplayName}] [{args.Path}]"
-            : $"[{DisplayName}] [{arguments}]";
-    }
-
-    public async Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
-    {
-        if (!toolHelpers.TryDeserializeArguments(arguments, out WriteFileArguments? args, out string? error))
-        {
-            return new ToolExecutionResult(false, "Failed to write file: invalid arguments.", string.Empty, error ?? "Invalid JSON");
-        }
-
-        if (!toolHelpers.TryGetRequiredPath(args.Path, out string? resolvedPath, out string? pathError))
-        {
-            return new ToolExecutionResult(false, $"Failed to write file: invalid path '{args.Path}'.", string.Empty, pathError ?? "Access denied");
-        }
-
-        try
-        {
-            toolHelpers.EnsureDirectoryExists(resolvedPath);
-            await File.WriteAllTextAsync(resolvedPath, args.Content, cancellationToken);
-            return new ToolExecutionResult(true, $"Wrote content to '{args.Path}'.", $"Successfully wrote to '{args.Path}'.", string.Empty);
-        }
-        catch (Exception ex)
-        {
-            return new ToolExecutionResult(false, $"Error writing to '{args.Path}'.", string.Empty, ex.Message, ex);
-        }
-    }
-
-    internal record WriteFileArguments(string Path = "", string Content = "");
-}
-```
