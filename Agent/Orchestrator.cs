@@ -15,30 +15,31 @@ public sealed class Orchestrator(
     ISessionStore sessionStore,
     IEventPublisher eventPublisher,
     IBranchSquasher branchSquasher,
-    IMessagePromptBuilder messagePromptBuilder,
-    IPivotDetector pivotDetector,
     ICircuitBreaker circuitBreaker,
-    ISessionInspector sessionInspector) : IOrchestrator
+    IMessagePromptBuilder? messagePromptBuilder = null,
+    IPivotDetector? pivotDetector = null,
+    ISessionInspector? sessionInspector = null) : IOrchestrator
 {
     private readonly IChatClient _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
     private readonly IToolManager _toolManager = toolManager ?? throw new ArgumentNullException(nameof(toolManager));
     private readonly ISessionStore _sessionStore = sessionStore ?? throw new ArgumentNullException(nameof(sessionStore));
     private readonly IEventPublisher _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     private readonly IBranchSquasher _branchSquasher = branchSquasher ?? throw new ArgumentNullException(nameof(branchSquasher));
-    private readonly IMessagePromptBuilder _messagePromptBuilder = messagePromptBuilder ?? throw new ArgumentNullException(nameof(messagePromptBuilder));
-    private readonly IPivotDetector _pivotDetector = pivotDetector ?? throw new ArgumentNullException(nameof(pivotDetector));
     private readonly ICircuitBreaker _circuitBreaker = circuitBreaker ?? throw new ArgumentNullException(nameof(circuitBreaker));
-    private readonly ISessionInspector _sessionInspector = sessionInspector ?? throw new ArgumentNullException(nameof(sessionInspector));
+    private readonly IMessagePromptBuilder _messagePromptBuilder = messagePromptBuilder ?? new MessagePromptBuilder();
+    private readonly IPivotDetector _pivotDetector = pivotDetector ?? new PivotDetector();
+    private readonly ISessionInspector _sessionInspector = sessionInspector ?? new SessionInspector();
     private readonly ISession _session = (sessionStore ?? throw new ArgumentNullException(nameof(sessionStore))).Session;
 
     public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userInput);
 
+        // Stage 1: Initialise
         await InitialiseCycleAsync(userInput, cancellationToken);
-
         _circuitBreaker.Reset();
 
+        // 5-Stage ReAct execution loop
         while (_session.State != SessionState.Done && !cancellationToken.IsCancellationRequested)
         {
             if (!_circuitBreaker.TryAdvanceTurn(out string? limitExceededReason))
@@ -48,11 +49,15 @@ public sealed class Orchestrator(
                 break;
             }
 
+            // Stage 2: Think
             ThinkingPhaseResult thinkingResult = await ExecuteThinkingPhaseAsync(cancellationToken);
 
             if (thinkingResult.HasToolCalls)
             {
+                // Stage 3: Act
                 IReadOnlyList<ToolExecutionResult> toolResults = await ExecuteActingPhaseAsync(thinkingResult.ToolCalls, cancellationToken);
+
+                // Stage 4: Observe
                 await ExecuteObservingPhaseAsync(toolResults, cancellationToken);
             }
             else if (thinkingResult.IsCompleted)
@@ -61,6 +66,7 @@ public sealed class Orchestrator(
             }
         }
 
+        // Stage 5: Finalise
         await FinaliseCycleAsync(cancellationToken);
     }
 
@@ -282,4 +288,3 @@ public sealed class Orchestrator(
         public StringBuilder RawArguments { get; } = new();
     }
 }
-

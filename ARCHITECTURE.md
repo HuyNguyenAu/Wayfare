@@ -15,7 +15,7 @@ Wayfare/
 │   ├── AgentModels.cs                         // Agent interfaces & contract definitions
 │   ├── Orchestrator.cs                        // Core agent execution cycle & post-squash audit report
 │   ├── BranchSquasher.cs                      // STARL + Key Artifacts milestone compressor
-│   ├── Prompts.cs                             // Message prompt builder using ISessionProjector
+│   ├── Prompts.cs                             // Message prompt builder & system instructions
 │   ├── PivotDetector.cs                       // User intent pivot detection
 │   └── CircuitBreaker.cs                      // Loop detection & repetition breaker guards
 ├── Session/                                   // Immutable Context Ledger, Transformations & Projection
@@ -29,13 +29,11 @@ Wayfare/
 │   │   ├── ResourceIndex.cs                   // Resource access index and extraction
 │   │   ├── WriteShadowingRule.cs              // Superseded state elimination
 │   │   └── DiagnosticCollapseRule.cs          // Ephemeral exploratory action pruning
-│   ├── Projection/                            // Context projection for LLM inference
-│   │   └── SessionProjector.cs                // Linear trunk context projector
 │   └── Inspection/                            // Observability & transformation history traversal
 │       └── SessionInspector.cs                // Recursive lineage unwrapping & audit metrics
 ├── Tools/                                     // Tool interfaces, manager, and built-ins
 │   ├── ITool.cs                               // Tool interfaces, schema, and execution results
-│   ├── ToolManager.cs                         // Dynamic Roslyn tool compilation and registry
+│   ├── ToolManager.cs                         // Fast O(1) in-memory tool registry
 │   ├── ToolHelpers.cs                         // Path sanitisation, ignore filters, argument parsing
 │   └── Implementations/                       // Core tools (read, write, replace, find, list, execute, inspect)
 │       ├── ExecuteCommandTool.cs
@@ -53,17 +51,24 @@ Wayfare/
 │   │   ├── SessionMessageMapper.cs            // SessionMessage to ChatMessage converter
 │   │   └── ToolMapper.cs                      // ITool to AIFunction / AITool mapper
 │   ├── Clients/OpenAIClient.cs                // DelegatingChatClient for OpenAI reasoning extraction
-│   └── Events/                                // Channel-based event broker & event records
+│   └── Events/                                // Channel-based event broker & flat AgentEvent records
 │       ├── Events.cs                          // CycleCompletedEvent with SessionAuditReport
 │       └── EventBroker.cs
-└── UI/                                        // Terminal rendering and visual feedback
-    ├── ITerminalUI.cs                         // UI presentation contracts
-    ├── TerminalUI.cs                          // Spectre.Console implementation
-    ├── ColourPalette.cs                       // Solarpunk circadian colour tokens
-    └── Components/                            // Streaming Markdown, thinking token & audit renderers
-        ├── MarkdownStreamRenderer.cs
-        ├── ProgressRenderer.cs                // Harvested milestones & Solarpunk audit reporter
-        └── ThinkingStreamRenderer.cs
+├── UI/                                        // Terminal rendering and visual feedback
+│   ├── ITerminalUI.cs                         // UI presentation contracts
+│   ├── TerminalUI.cs                          // Pattern-matched Spectre.Console implementation
+│   ├── ColourPalette.cs                       // Solarpunk circadian colour tokens
+│   └── Components/                            // Streaming Markdown, thinking token & audit renderers
+│       ├── MarkdownStreamRenderer.cs
+│       ├── ProgressRenderer.cs                // Harvested milestones & Solarpunk audit reporter
+│       └── ThinkingStreamRenderer.cs
+└── Wayfare.Tests/                             // Comprehensive in-memory domain unit tests
+    ├── TransformationPipelineTests.cs         // Write shadowing & diagnostic collapse validation
+    ├── CircuitBreakerTests.cs                 // Loop detection & turn limiter validation
+    ├── PivotDetectorTests.cs                  // User intent pivot detection tests
+    ├── ToolTests.cs                           // Read, write, replace, list, find, inspect tests
+    ├── PromptBuilderTests.cs                  // Message prompt assembly tests
+    └── EventBrokerTests.cs                    // Channel event dispatch tests
 ```
 
 ---
@@ -109,7 +114,7 @@ Every turn in the agent execution loop proceeds through a strictly linear 5-stag
 | Stage | Focus | Key Operations |
 | :--- | :--- | :--- |
 | **1. Initialise** | Context Setup | Ingest user message, detect branch pivots via `PivotDetector`, create active `BranchContainerNode`, and transition state to `Thinking`. |
-| **2. Think** | LLM Inference | Construct system and branch messages via `MessagePromptBuilder` using `ISessionProjector` (projecting only active linear trunk nodes) and stream inference tokens and tool calls via `IChatClient`. |
+| **2. Think** | LLM Inference | Construct system and branch messages via `MessagePromptBuilder` (projecting active linear trunk nodes directly) and stream inference tokens and tool calls via `IChatClient`. |
 | **3. Act** | Tool Dispatch | Intercept repeated tool calls via `CircuitBreaker`, resolve requested tools via `ToolManager`, and execute tools using safe `IToolHelpers` boundaries. |
 | **4. Observe** | Feedback Loop | Append `ToolResultMessage` observation records to active branch, automatically trigger deterministic transformations (`WriteShadowingRule`, `DiagnosticCollapseRule`), update `LinearTrunk`, and loop back to **Think**. |
 | **5. Finalise** | Completion | Compress completed active branch into STARL + Key Artifacts milestone summary via `BranchSquasher`, persist session state to disk asynchronously, generate `SessionAuditReport` via `ISessionInspector`, and emit `CycleCompletedEvent(milestones, auditReport)`. |
@@ -135,7 +140,7 @@ graph LR
     Pipeline --> Rules
     Rules --> Trunk["Linear Trunk<br/>(Active Outermost Nodes)"]
     
-    Trunk --> Projector["Linear Context Projector"]
+    Trunk --> Projector["Linear Context Projection"]
     Projector --> LLM["LLM Inference Context"]
     
     Trunk --> Inspector["Session Inspector"]
@@ -152,10 +157,10 @@ graph LR
 
 ### Deterministic Transformation Rules
 - **Write Shadowing (`WriteShadowingRule`)**: Indexes read/write resource accesses via `ResourceIndex`. When a persistent write mutation completes, all prior observation payloads for that resource are wrapped in `SupersededStateNode` with lightweight reference stubs.
-- **Diagnostic Collapse (`DiagnosticCollapseRule`)**: Table-driven categorization distinguishing exploratory discovery actions (`list`, `find`) from persistent mutations (`write`, `replace`). Ephemeral exploratory actions preceding a terminal action are bundled into a single `CollapsedExplorationNode`.
+- **Diagnostic Collapse (`DiagnosticCollapseRule`)**: Table-driven categorisation distinguishing exploratory discovery actions (`list`, `find`) from persistent mutations (`write`, `replace`). Ephemeral exploratory actions preceding a terminal action are bundled into a single `CollapsedExplorationNode`.
 
-### Linear Context Projector & Session Inspector
-- **`SessionProjector`**: Traverses the active `LinearTrunk` and extracts the outermost active representation of each node (`ToProjectedMessage()`), producing an optimized, compact message list for LLM context buffers.
+### Linear Context Projection & Session Inspector
+- **`ToProjectedMessages()`**: Traverses active `LinearTrunk` and extracts the outermost active representation of each node (`ToProjectedMessage()`), producing an optimised, compact message list for LLM context buffers.
 - **`SessionInspector`**: Recursively traverses transformation histories down to root turns, reconstructs complete uncompressed raw histories, and computes audit metrics (raw turns, active projected turns, compression ratio, shadowed observations, collapsed groups).
 
 ---
@@ -179,12 +184,6 @@ Key Artifacts:
 - Invariants: [exact verified outputs, exit codes, state transitions, or symbol/schema guarantees]
 </milestone_summary>
 ```
-
-### Exact Invariant Guarantees
-1. **Zero Detail Loss for File Mutations**: All modified or created file paths are recorded exactly to avoid ambiguity in subsequent turns.
-2. **Deterministic Verification State**: Exit codes, build outcomes, and schema changes are captured under invariants.
-3. **XML Boundary Extraction**: `BranchSquasher` strips wrapper tags and conversational preambles to ensure pristine storage in `BranchContainerNode.Summary`.
-4. **Context Ledger Audit Emission**: Upon squashing, `Orchestrator` computes and publishes the `SessionAuditReport` to be rendered in Chlorophyll OS UI.
 
 ---
 

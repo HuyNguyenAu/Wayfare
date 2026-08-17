@@ -24,8 +24,8 @@ public sealed class ToolAIFunction(ITool tool) : AIFunction
         AIFunctionArguments arguments,
         CancellationToken cancellationToken)
     {
-        string serializedArguments = JsonSerializer.Serialize(arguments);
-        return await _tool.ExecuteAsync(serializedArguments, cancellationToken);
+        string serialisedArguments = JsonSerializer.Serialize(arguments);
+        return await _tool.ExecuteAsync(serialisedArguments, cancellationToken);
     }
 }
 

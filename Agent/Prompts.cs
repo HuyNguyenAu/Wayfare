@@ -2,7 +2,6 @@ namespace Wayfare.Agent;
 
 using System.Text;
 using Wayfare.Session;
-using Wayfare.Session.Projection;
 
 public static class SystemPromptBuilder
 {
@@ -24,14 +23,8 @@ public static class SystemPromptBuilder
     }
 }
 
-public sealed class MessagePromptBuilder(ISessionProjector projector) : IMessagePromptBuilder
+public sealed class MessagePromptBuilder : IMessagePromptBuilder
 {
-    private readonly ISessionProjector _projector = projector ?? throw new ArgumentNullException(nameof(projector));
-
-    public MessagePromptBuilder() : this(new SessionProjector())
-    {
-    }
-
     public IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<HistoryNode> history)
     {
         ArgumentNullException.ThrowIfNull(history);
@@ -42,11 +35,9 @@ public sealed class MessagePromptBuilder(ISessionProjector projector) : IMessage
         }
 
         List<SessionMessage> messages = [
-            new SystemMessage(SystemPromptBuilder.Build())
+            new SystemMessage(SystemPromptBuilder.Build()),
+            .. activeBranch.Turns.ToProjectedMessages()
         ];
-
-        IReadOnlyList<SessionMessage> projectedTurns = _projector.ProjectMessages(activeBranch.Turns);
-        messages.AddRange(projectedTurns);
 
         return messages.AsReadOnly();
     }

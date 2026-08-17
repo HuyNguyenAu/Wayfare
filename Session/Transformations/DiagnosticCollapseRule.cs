@@ -90,9 +90,12 @@ public sealed class DiagnosticCollapseRule : ITransformationRule
         return new TrunkTransformResult(true, newTrunk.AsReadOnly());
     }
 
-    public static ToolActionCategory Categorize(string toolName, string arguments = "", bool isSuccess = true)
+    public static ToolActionCategory Categorise(string? toolName, string arguments = "", bool isSuccess = true)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
+        if (string.IsNullOrWhiteSpace(toolName))
+        {
+            return ToolActionCategory.Other;
+        }
 
         if (_alwaysExploratoryTools.Contains(toolName))
         {
@@ -123,7 +126,7 @@ public sealed class DiagnosticCollapseRule : ITransformationRule
         {
             return toolResultMessage.Results.Any(result =>
                 result.Success &&
-                Categorize(result.ToolName, result.DisplayMessage, result.Success) == ToolActionCategory.TerminalAction);
+                Categorise(result.ToolName, result.DisplayMessage, result.Success) == ToolActionCategory.TerminalAction);
         }
 
         return false;
@@ -141,13 +144,13 @@ public sealed class DiagnosticCollapseRule : ITransformationRule
         if (message is ToolCallMessage toolCallMessage)
         {
             return toolCallMessage.ToolCalls.All(call =>
-                Categorize(call.Name, call.Arguments) == ToolActionCategory.Exploratory);
+                Categorise(call.Name, call.Arguments) == ToolActionCategory.Exploratory);
         }
 
         if (message is ToolResultMessage toolResultMessage)
         {
             return toolResultMessage.Results.All(result =>
-                Categorize(result.ToolName, result.DisplayMessage, result.Success) == ToolActionCategory.Exploratory);
+                Categorise(result.ToolName, result.DisplayMessage, result.Success) == ToolActionCategory.Exploratory);
         }
 
         return false;

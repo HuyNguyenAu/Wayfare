@@ -2,7 +2,6 @@ namespace Wayfare.Tools;
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using Wayfare.Infrastructure.Configuration;
 
 public sealed class ToolHelpers(IReadOnlyList<string> excludedDirectories) : IToolHelpers
 {

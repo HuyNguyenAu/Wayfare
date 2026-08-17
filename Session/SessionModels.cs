@@ -1,5 +1,6 @@
 namespace Wayfare.Session;
 
+using System.Text;
 using System.Text.Json.Serialization;
 using Wayfare.Infrastructure.AI;
 using Wayfare.Tools;
@@ -87,12 +88,12 @@ public sealed record BranchContainerNode(
 [JsonDerivedType(typeof(ToolResultMessage), "tool_result")]
 public abstract record SessionMessage
 {
-    public abstract void AppendTraceLines(System.Text.StringBuilder builder);
+    public abstract void AppendTraceLines(StringBuilder builder);
 }
 
 public sealed record SystemMessage(string Content) : SessionMessage
 {
-    public override void AppendTraceLines(System.Text.StringBuilder builder)
+    public override void AppendTraceLines(StringBuilder builder)
     {
         builder.AppendLine($"System: {Content}");
     }
@@ -100,7 +101,7 @@ public sealed record SystemMessage(string Content) : SessionMessage
 
 public sealed record UserMessage(string Content) : SessionMessage
 {
-    public override void AppendTraceLines(System.Text.StringBuilder builder)
+    public override void AppendTraceLines(StringBuilder builder)
     {
         builder.AppendLine($"User: {Content}");
     }
@@ -108,7 +109,7 @@ public sealed record UserMessage(string Content) : SessionMessage
 
 public sealed record AssistantMessage(string Content) : SessionMessage
 {
-    public override void AppendTraceLines(System.Text.StringBuilder builder)
+    public override void AppendTraceLines(StringBuilder builder)
     {
         builder.AppendLine($"Assistant: {Content}");
     }
@@ -116,7 +117,7 @@ public sealed record AssistantMessage(string Content) : SessionMessage
 
 public sealed record ToolCallMessage(IReadOnlyList<ToolCall> ToolCalls) : SessionMessage
 {
-    public override void AppendTraceLines(System.Text.StringBuilder builder)
+    public override void AppendTraceLines(StringBuilder builder)
     {
         foreach (ToolCall toolCall in ToolCalls)
         {
@@ -127,7 +128,7 @@ public sealed record ToolCallMessage(IReadOnlyList<ToolCall> ToolCalls) : Sessio
 
 public sealed record ToolResultMessage(IReadOnlyList<ToolExecutionResult> Results) : SessionMessage
 {
-    public override void AppendTraceLines(System.Text.StringBuilder builder)
+    public override void AppendTraceLines(StringBuilder builder)
     {
         foreach (ToolExecutionResult result in Results)
         {
@@ -137,13 +138,11 @@ public sealed record ToolResultMessage(IReadOnlyList<ToolExecutionResult> Result
     }
 }
 
-public static class SessionMessageExtensions
+public static class HistoryNodeExtensions
 {
-    public static void AppendTraceLines(this SessionMessage message, System.Text.StringBuilder builder)
+    public static IReadOnlyList<SessionMessage> ToProjectedMessages(this IEnumerable<HistoryNode> nodes)
     {
-        ArgumentNullException.ThrowIfNull(message);
-        ArgumentNullException.ThrowIfNull(builder);
-
-        message.AppendTraceLines(builder);
+        ArgumentNullException.ThrowIfNull(nodes);
+        return [.. nodes.Select(node => node.ToProjectedMessage())];
     }
 }

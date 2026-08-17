@@ -42,7 +42,7 @@ graph TD
     end
 
     Orch -->|Append Turns| Ledger
-    Proj -->|Optimized Context Buffer| LLM
+    Proj -->|Optimised Context Buffer| LLM
     Orch -->|Branch Completed| Harvest
 ```
 
@@ -57,7 +57,7 @@ graph TD
 
 2. **Deterministic Transformation Pipeline ([`Session/Transformations/`](Session/Transformations/)):**
    - **Write Shadowing (Superseded State Elimination)**: Scans write actions (`write`, `replace`), indexes mutated resources, and wraps past raw read/write observations in lightweight reference stubs.
-   - **Diagnostic Collapse (Ephemeral Action Pruning)**: Categorizes tool schemas into exploratory discovery versus persistent mutations, bundling preceding exploratory sequences upon completing terminal mutations.
+   - **Diagnostic Collapse (Ephemeral Action Pruning)**: Categorises tool schemas into exploratory discovery versus persistent mutations, bundling preceding exploratory sequences upon completing terminal mutations.
    - **Transformation History & Identity Invariants**: Persistent unique Node IDs across all transformations and support for arbitrary wrapping depth.
 
 3. **Linear Context Projector & Session Inspector ([`Session/Projection/`](Session/Projection/) & [`Session/Inspection/`](Session/Inspection/)):**
@@ -143,8 +143,8 @@ Wayfare/
 | **Read File** | `read` | Read line range from file (`path`, `offset`, `limit`). Default limit is 200 lines. | Formatted with 1-indexed, right-aligned line numbers wrapped in `<observation tool="read_file" path="..." lines="..." total_lines="...">`. |
 | **Write File** | `write` | Create new file or overwrite file content (`path`, `content`). | Structured result confirming written byte/line counts. Triggers write shadowing on prior read/write observations. |
 | **Replace Content** | `replace` | Exact unique string replacement in file (`path`, `oldText`, `newText`, `startLine`, `endLine`). | Supports optional line search window bounds (`startLine`, `endLine`). Triggers write shadowing on prior read/write observations. |
-| **List Directory** | `list` | List contents of directory (`path`). | Filtered against excluded noise directories. Categorized as exploratory for diagnostic collapse. |
-| **Find Files** | `find` | Find files matching pattern (`path`, `pattern`). | Filtered by `Settings.ExcludedDirectories`, capped at 50 results. Categorized as exploratory for diagnostic collapse. |
+| **List Directory** | `list` | List contents of directory (`path`). | Filtered against excluded noise directories. Categorised as exploratory for diagnostic collapse. |
+| **Find Files** | `find` | Find files matching pattern (`path`, `pattern`). | Filtered by `Settings.ExcludedDirectories`, capped at 50 results. Categorised as exploratory for diagnostic collapse. |
 | **Execute Command** | `execute` | Run executable command in working directory (`command`, `arguments`). | Captured standard output and error streams. |
 | **Inspect Milestone** | `inspect_milestone` | Inspect details and compressed turns of a past milestone (`id`). | Detailed compressed turns and summary of target squashed milestone. |
 
@@ -161,7 +161,6 @@ MODEL_NAME=MODEL_NAME
 API_KEY=local-no-key-needed
 ENDPOINT=http://127.0.0.1:8080/
 TOOLS_PATH=/home/dev/Wayfare/Tools/Implementations
-COMPILED_DIRECTORY=/home/dev/Wayfare/compiled
 SESSIONS_DIRECTORY=/home/dev/Wayfare/sessions
 MAX_TURNS=15
 EXCLUDED_DIRECTORIES=.git,bin,obj,node_modules,.vs
@@ -172,8 +171,7 @@ EXCLUDED_DIRECTORIES=.git,bin,obj,node_modules,.vs
 | `MODEL_NAME` | Yes | — | Name of LLM model to target. |
 | `API_KEY` | Yes | — | API key or token for LLM endpoint. |
 | `ENDPOINT` | Yes | — | Base HTTP URL of OpenAI-compatible API endpoint. |
-| `TOOLS_PATH` | Yes | — | Directory path containing dynamic Roslyn tool implementations. |
-| `COMPILED_DIRECTORY` | Yes | — | Directory path for cached Roslyn compiled tool DLLs. |
+| `TOOLS_PATH` | Yes | — | Directory path containing tool implementations. |
 | `SESSIONS_DIRECTORY` | Yes | — | Directory path where session AST logs are persisted. |
 | `MAX_TURNS` | No | `15` | Maximum ReAct loop iterations per user turn before circuit breaker triggers. |
 | `EXCLUDED_DIRECTORIES` | No | `.git,bin,obj,node_modules,.vs` | Comma- or semicolon-separated directory names to ignore during file searches and path traversal. |

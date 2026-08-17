@@ -4,24 +4,24 @@ using System.Threading.Channels;
 
 public sealed class EventBroker : IEventBroker
 {
-    private readonly Channel<IEvent> _channel;
+    private readonly Channel<AgentEvent> _channel;
 
     public EventBroker()
     {
-        _channel = Channel.CreateUnbounded<IEvent>(new UnboundedChannelOptions
+        _channel = Channel.CreateUnbounded<AgentEvent>(new UnboundedChannelOptions
         {
             SingleReader = false,
             SingleWriter = false
         });
     }
 
-    public void Publish(IEvent @event)
+    public void Publish(AgentEvent @event)
     {
         ArgumentNullException.ThrowIfNull(@event);
         _channel.Writer.TryWrite(@event);
     }
 
-    public IAsyncEnumerable<IEvent> ReadAllAsync(CancellationToken cancellationToken)
+    public IAsyncEnumerable<AgentEvent> ReadAllAsync(CancellationToken cancellationToken)
     {
         return _channel.Reader.ReadAllAsync(cancellationToken);
     }

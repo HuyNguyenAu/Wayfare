@@ -8,7 +8,6 @@ public sealed record Settings
     public required string ApiKey { get; init; }
     public required string Endpoint { get; init; }
     public required string ToolsPath { get; init; }
-    public required string CompiledDirectory { get; init; }
     public required string SessionsDirectory { get; init; }
     public int MaxTurns { get; init; } = 15;
     public IReadOnlyList<string> ExcludedDirectories { get; init; } = DefaultExcludedDirectories;
@@ -23,7 +22,6 @@ public sealed record Settings
             ApiKey = GetValue("API_KEY"),
             Endpoint = GetValue("ENDPOINT"),
             ToolsPath = GetValue("TOOLS_PATH"),
-            CompiledDirectory = GetValue("COMPILED_DIRECTORY"),
             SessionsDirectory = GetValue("SESSIONS_DIRECTORY"),
             MaxTurns = GetOptionalInt("MAX_TURNS", 15),
             ExcludedDirectories = GetOptionalStringList("EXCLUDED_DIRECTORIES", DefaultExcludedDirectories)

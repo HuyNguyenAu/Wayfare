@@ -64,6 +64,6 @@ public interface IToolManager
     IReadOnlyList<ITool> Tools { get; }
     IReadOnlyList<Exception> Errors { get; }
 
-    Task LoadToolsAsync(string directoryPath, string searchPattern, string compiledDirectoryPath, CancellationToken cancellationToken);
+    Task LoadToolsAsync(string directoryPath, string searchPattern, CancellationToken cancellationToken);
     ITool GetTool(string name);
 }
