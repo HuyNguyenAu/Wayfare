@@ -5,7 +5,6 @@ public sealed class Session : ISession
     private readonly List<HistoryNode> _history = [];
 
     public SessionState State { get; private set; } = SessionState.Idle;
-    public string Intent { get; private set; } = string.Empty;
     public IReadOnlyList<HistoryNode> History => _history.AsReadOnly();
 
     public void StartBranch()
@@ -31,12 +30,6 @@ public sealed class Session : ISession
         };
     }
 
-    public void UpdateIntent(string intent)
-    {
-        ArgumentNullException.ThrowIfNull(intent);
-        Intent = intent;
-    }
-
     public SessionMessage? GetLastMessage()
     {
         if (_history.Count == 0 || _history[^1] is not BranchNode branch)
@@ -49,15 +42,8 @@ public sealed class Session : ISession
 
     public SessionProgress GetProgress()
     {
-        if (_history.Count == 0)
-        {
-            return new SessionProgress(string.Empty, []);
-        }
-
-        string objective = string.IsNullOrWhiteSpace(Intent) ? "Awaiting directive..." : Intent;
         List<string> milestones = [.. _history.OfType<BranchNode>().Select(branch => branch.Summary)];
-
-        return new SessionProgress(objective, milestones.AsReadOnly());
+        return new SessionProgress(milestones.AsReadOnly());
     }
 
     public void TransitionTo(SessionState newState)

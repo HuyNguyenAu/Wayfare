@@ -106,13 +106,12 @@ public static class ProgressRenderer
         AnsiConsole.MarkupLine($"[{ColourPalette.HexBiolumAzure}]✁ {Markup.Escape("[PRUNING]")}[/] {Markup.Escape("Compressing epoch turns into root milestone...")}");
     }
 
-    public static void RenderObjectiveAndMilestones(string objective, IReadOnlyList<string> milestones)
+    public static void RenderMilestones(IReadOnlyList<string> milestones)
     {
         AnsiConsole.WriteLine();
 
         Grid grid = new();
         grid.AddColumn();
-        grid.AddRow(new Markup($"[{ColourPalette.HexTerracottaSol} bold]⑂ BIOSPHERE DIRECTIVE:[/] [{ColourPalette.HexMyceliumLinen}]{Markup.Escape(objective)}[/]"));
         grid.AddRow(new Markup($"[{ColourPalette.HexBiolumAzure} bold]{Markup.Escape($"❦ HARVESTED MILESTONES [{milestones.Count} CYCLES]:")}[/]"));
 
         for (int milestoneIndex = 0; milestoneIndex < milestones.Count; milestoneIndex++)

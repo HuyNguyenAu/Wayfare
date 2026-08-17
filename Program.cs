@@ -73,10 +73,9 @@ public static class Program
 
         BranchSquasher branchSquasher = new(chatClient);
         MessagePromptBuilder messagePromptBuilder = new();
-        IntentResolver intentResolver = new(chatClient);
         PivotDetector pivotDetector = new();
         CircuitBreaker circuitBreaker = new(settings.MaxTurns);
-        Orchestrator orchestrator = new(chatClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, intentResolver, pivotDetector, circuitBreaker);
+        Orchestrator orchestrator = new(chatClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, pivotDetector, circuitBreaker);
 
         try
         {

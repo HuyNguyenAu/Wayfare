@@ -15,7 +15,6 @@ public sealed class Orchestrator(
     IEventPublisher eventPublisher,
     IBranchSquasher branchSquasher,
     IMessagePromptBuilder messagePromptBuilder,
-    IIntentResolver intentResolver,
     IPivotDetector pivotDetector,
     ICircuitBreaker circuitBreaker) : IOrchestrator
 {
@@ -25,7 +24,6 @@ public sealed class Orchestrator(
     private readonly IEventPublisher _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     private readonly IBranchSquasher _branchSquasher = branchSquasher ?? throw new ArgumentNullException(nameof(branchSquasher));
     private readonly IMessagePromptBuilder _messagePromptBuilder = messagePromptBuilder ?? throw new ArgumentNullException(nameof(messagePromptBuilder));
-    private readonly IIntentResolver _intentResolver = intentResolver ?? throw new ArgumentNullException(nameof(intentResolver));
     private readonly IPivotDetector _pivotDetector = pivotDetector ?? throw new ArgumentNullException(nameof(pivotDetector));
     private readonly ICircuitBreaker _circuitBreaker = circuitBreaker ?? throw new ArgumentNullException(nameof(circuitBreaker));
     private readonly ISession _session = (sessionStore ?? throw new ArgumentNullException(nameof(sessionStore))).Session;
@@ -67,11 +65,9 @@ public sealed class Orchestrator(
     {
         if (_pivotDetector.IsPivot(userInput) && HasActiveUnsquashedBranch(_session))
         {
-            _session.SquashBranch($"Abandoned: {_session.Intent}. Reason: User pivoted to '{userInput}'.", BranchStatus.Abandoned);
+            _session.SquashBranch($"Abandoned. Reason: User pivoted to '{userInput}'.", BranchStatus.Abandoned);
         }
 
-        string resolvedIntent = await _intentResolver.ResolveAsync(_session.Intent, userInput, cancellationToken);
-        _session.UpdateIntent(resolvedIntent);
         _session.StartBranch();
         _session.TransitionTo(SessionState.Thinking);
 
@@ -255,11 +251,10 @@ public sealed class Orchestrator(
 
         string summary = await _branchSquasher.SquashAsync(_session, cancellationToken);
         _session.SquashBranch(summary, BranchStatus.Completed);
-        _session.UpdateIntent(string.Empty);
         await _sessionStore.SaveAsync(cancellationToken);
 
         SessionProgress progress = _session.GetProgress();
-        _eventPublisher.Publish(new CycleCompletedEvent(progress.Objective, progress.Milestones));
+        _eventPublisher.Publish(new CycleCompletedEvent(progress.Milestones));
     }
 
     private IReadOnlyList<string> GetPreviousToolNames()

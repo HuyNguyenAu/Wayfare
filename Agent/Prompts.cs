@@ -47,39 +47,23 @@ public sealed class MessagePromptBuilder : IMessagePromptBuilder
     }
 }
 
-public static class IntentPromptBuilder
-{
-    public static string BuildSystem() => """
-        Extract the active goal from user input. Wrap the active goal in <goal>...</goal>.
-        Example:
-        <goal>Fix null reference exception in SessionStore.cs</goal>
-        """;
-
-    public static string BuildUser(string currentIntent, string userInput)
-    {
-        ArgumentNullException.ThrowIfNull(currentIntent);
-        ArgumentException.ThrowIfNullOrWhiteSpace(userInput);
-
-        return $"""
-        <current_intent>{(string.IsNullOrWhiteSpace(currentIntent) ? "none" : currentIntent.Trim())}</current_intent>
-        <user_input>{userInput.Trim()}</user_input>
-        """;
-    }
-}
-
 public static class SquashPromptBuilder
 {
     public static string Build() => """
-        Summarise the milestone from the execution trace. Wrap the summary in <milestone_summary>...</milestone_summary> using STARL format (Situation, Task, Action, Result, Learnings).
-        Each section must be 1-2 concise sentences.
+        Summarise the milestone from the execution trace. Wrap the summary in <milestone_summary>...</milestone_summary> using STARL format (Situation, Task, Action, Result, Learnings) and explicitly capture Key Artifacts for Exact Invariants.
+        Each STARL section must be 1-2 concise sentences.
+        Under Key Artifacts, list exact file paths modified/created/read, exact commands executed, and key state/schema invariants established.
 
         Example:
         <milestone_summary>
         Situation: Context before starting this branch.
         Task: Specific task or goal.
         Action: Steps taken to address the task.
-        Result: Concrete outcome or produced artifacts.
+        Result: Concrete outcome or produced changes.
         Learnings: Key insights or constraints discovered.
+        Key Artifacts:
+        - Files: [exact file paths created, modified, or inspected]
+        - Invariants: [exact verified outputs, exit codes, state transitions, or symbol/schema guarantees]
         </milestone_summary>
         """;
 }

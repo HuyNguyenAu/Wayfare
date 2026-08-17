@@ -11,10 +11,11 @@ Wayfare is organised into distinct vertical domain slices:
 ```
 Wayfare/
 ├── Program.cs                         // Composition root & top-level REPL loop
-├── Agent/                             // 5-stage loop, prompt builder, intent resolution
+├── Agent/                             // 5-stage loop, prompt builder, branch squashing
 │   ├── Orchestrator.cs                // Core agent execution cycle
-│   ├── IntentResolver.cs              // Goal extraction & active intent tracking
+│   ├── BranchSquasher.cs              // STARL + Key Artifacts milestone compressor
 │   ├── Prompts.cs                     // Message prompt builder & prompt templates
+│   ├── PivotDetector.cs               // User direction & pivot detection
 │   └── CircuitBreaker.cs              // Loop detection & repetition guards
 ├── Session/                           // Linear turn history, state, and persistence
 │   ├── ISession.cs                    // Session contracts and turn management
@@ -45,7 +46,7 @@ Every turn in the agent execution loop proceeds through a strictly linear 5-stag
 ```
                   ┌─────────────────────────────────────┐
                   │          1. INITIALISE              │
-                  │   Extract goal & setup turn state   │
+                  │   Branch creation & turn setup      │
                   └──────────────────┬──────────────────┘
                                      │
                                      ▼
@@ -78,11 +79,11 @@ Every turn in the agent execution loop proceeds through a strictly linear 5-stag
 
 | Stage | Focus | Key Operations |
 | :--- | :--- | :--- |
-| **1. Initialise** | Context Setup | Ingest user message, extract active `<goal>` tags via `IntentResolver`, and initialise the turn state. |
+| **1. Initialise** | Context Setup | Ingest user message, detect branch pivots, start new active branch, and initialise the turn state. |
 | **2. Think** | LLM Inference | Construct prompt via `MessagePromptBuilder` and stream tokens via `IChatClient`. |
 | **3. Act** | Tool Dispatch | Resolve requested tools via `ToolManager` and execute tools using safe `IToolHelpers` boundaries. |
 | **4. Observe** | Feedback Loop | Append tool observation records to turn history and loop back to **Think**. |
-| **5. Finalise** | Completion | Compress completed turns into milestone summary, persist session state to disk asynchronously, and emit `CycleCompletedEvent`. |
+| **5. Finalise** | Completion | Compress completed turns into STARL + Key Artifacts milestone summary, persist session state to disk asynchronously, and emit `CycleCompletedEvent`. |
 
 ---
 

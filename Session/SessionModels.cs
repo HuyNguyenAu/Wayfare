@@ -20,7 +20,7 @@ public enum BranchStatus
     Abandoned,
 }
 
-public sealed record SessionProgress(string Objective, IReadOnlyList<string> Milestones);
+public sealed record SessionProgress(IReadOnlyList<string> Milestones);
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(BranchNode), "branch")]

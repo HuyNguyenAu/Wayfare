@@ -47,7 +47,7 @@ public sealed class TerminalUI : ITerminalUI, IAsyncDisposable
             [typeof(ToolExecutionStartedEvent)] = (eventInstance, _) => { ToolExecutionStartedEvent executionStartedEvent = (ToolExecutionStartedEvent)eventInstance; ProgressRenderer.RenderToolExecutionStarted(executionStartedEvent.InvocationMessage); return Task.CompletedTask; },
             [typeof(ToolExecutionCompletedEvent)] = (eventInstance, _) => { ToolExecutionCompletedEvent executionCompletedEvent = (ToolExecutionCompletedEvent)eventInstance; ProgressRenderer.RenderToolExecutionCompleted(executionCompletedEvent.Success, executionCompletedEvent.DisplayMessage); return Task.CompletedTask; },
             [typeof(SquashingBranchEvent)] = (_, _) => { ProgressRenderer.RenderSquashingBranch(); return Task.CompletedTask; },
-            [typeof(CycleCompletedEvent)] = (eventInstance, _) => { CycleCompletedEvent cycleCompletedEvent = (CycleCompletedEvent)eventInstance; ProgressRenderer.RenderObjectiveAndMilestones(cycleCompletedEvent.Objective, cycleCompletedEvent.Milestones); return Task.CompletedTask; },
+            [typeof(CycleCompletedEvent)] = (eventInstance, _) => { CycleCompletedEvent cycleCompletedEvent = (CycleCompletedEvent)eventInstance; ProgressRenderer.RenderMilestones(cycleCompletedEvent.Milestones); return Task.CompletedTask; },
         };
 
         _eventLoopTask = Task.Run(() => ProcessEventsAsync(cancellationToken), cancellationToken);

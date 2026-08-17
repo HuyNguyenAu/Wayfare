@@ -47,4 +47,4 @@ public sealed record TokenChunkReceivedEvent(string Content) : IEvent;
 
 public sealed record SquashingBranchEvent : IEvent;
 
-public sealed record CycleCompletedEvent(string Objective, IReadOnlyList<string> Milestones) : IEvent;
+public sealed record CycleCompletedEvent(IReadOnlyList<string> Milestones) : IEvent;

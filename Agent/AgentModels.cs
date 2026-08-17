@@ -15,11 +15,6 @@ public interface IBranchSquasher
     Task<string> SquashAsync(ISession session, CancellationToken cancellationToken);
 }
 
-public interface IIntentResolver
-{
-    Task<string> ResolveAsync(string currentIntent, string userInput, CancellationToken cancellationToken);
-}
-
 public interface IPivotDetector
 {
     bool IsPivot(string userInput);

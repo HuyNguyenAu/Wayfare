@@ -26,10 +26,10 @@ graph TD
    - [`TurnNode`](Session/SessionModels.cs): Leaf node wrapping discrete domain messages (`UserMessage`, `AssistantMessage`, `ToolCallMessage`, `ToolResultMessage`).
 
 2. **Context Engineering ([`Agent/Prompts.cs`](Agent/Prompts.cs)):**
-   - **Positive XML Framing**: Replaces fragile negative prompt constraints with structured XML boundary markers (`<goal>`, `<milestone_summary>`, `<observation>`).
+   - **Positive XML Framing**: Replaces fragile negative prompt constraints with structured XML boundary markers (`<milestone_summary>`, `<observation>`).
 
 3. **Branch Squashing ([`Agent/BranchSquasher.cs`](Agent/BranchSquasher.cs) & [`Agent/Prompts.cs`](Agent/Prompts.cs)):**
-   - Summarises completed active branches into STARL format (Situation, Task, Action, Result, Learnings) checkpoints inside `<milestone_summary>` tags to prevent prompt token bloat while keeping linear milestones intact.
+   - Summarises completed active branches into STARL format (Situation, Task, Action, Result, Learnings) plus **Key Artifacts for Exact Invariants** (exact file paths, executed commands, and state guarantees) inside `<milestone_summary>` tags to prevent prompt token bloat while keeping precise technical context intact.
 
 4. **Dynamic Roslyn Tool Engine ([`Tools/ToolManager.cs`](Tools/ToolManager.cs)):**
    - Compiles tool implementations (`Tools/Implementations/*.cs`) at runtime using Roslyn.
@@ -77,7 +77,6 @@ Wayfare/
 ├── Agent/                                     // 5-phase orchestration pipeline & prompt builders
 │   ├── AgentModels.cs
 │   ├── Orchestrator.cs
-│   ├── IntentResolver.cs
 │   ├── PivotDetector.cs
 │   ├── BranchSquasher.cs
 │   ├── CircuitBreaker.cs                      // Loop detection & repetition breaker strategy

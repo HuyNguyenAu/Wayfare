@@ -22,8 +22,20 @@ public sealed class BranchSquasher(IChatClient chatClient) : IBranchSquasher
             new ChatMessage(ChatRole.User, BuildTraceString(activeBranch))
         ];
         ChatResponse response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+        string summary = (response.Text ?? string.Empty).Trim();
 
-        return (response.Text ?? string.Empty).Trim();
+        if (summary.Contains("<milestone_summary>", StringComparison.Ordinal) && summary.Contains("</milestone_summary>", StringComparison.Ordinal))
+        {
+            int start = summary.IndexOf("<milestone_summary>", StringComparison.Ordinal) + "<milestone_summary>".Length;
+            int end = summary.IndexOf("</milestone_summary>", start, StringComparison.Ordinal);
+
+            if (end > start)
+            {
+                summary = summary[start..end].Trim();
+            }
+        }
+
+        return summary;
     }
 
     private static string BuildTraceString(BranchNode activeBranch)
