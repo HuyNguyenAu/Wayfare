@@ -7,11 +7,6 @@ using Wayfare.Core.Models;
 using Wayfare.Core.Models.Ast;
 using Wayfare.Core.Models.Messages;
 
-public interface IOrchestrator
-{
-    Task RunCycleAsync(string userInput, CancellationToken cancellationToken);
-}
-
 public class Orchestrator(
     IChatClient chatClient,
     IToolManager toolManager,
@@ -23,6 +18,8 @@ public class Orchestrator(
     IPivotDetector pivotDetector) : IOrchestrator
 {
     private readonly ISession _session = sessionStore.Session;
+
+    #region Pipeline Entry Point
 
     public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
     {
@@ -48,6 +45,10 @@ public class Orchestrator(
         await FinaliseCycleAsync(cancellationToken);
     }
 
+    #endregion
+
+    #region Phase 1: Initialise
+
     private async Task InitialiseCycleAsync(string userInput, CancellationToken cancellationToken)
     {
         if (pivotDetector.IsPivot(userInput) && HasActiveUnsquashedBranch(_session))
@@ -65,7 +66,6 @@ public class Orchestrator(
         await sessionStore.SaveAsync(cancellationToken);
     }
 
-
     private static bool HasActiveUnsquashedBranch(ISession session)
     {
         return session.History.Count > 0 &&
@@ -73,6 +73,10 @@ public class Orchestrator(
                string.IsNullOrWhiteSpace(branch.Summary) &&
                branch.Turns.Count > 0;
     }
+
+    #endregion
+
+    #region Phase 2: Thinking
 
     private async Task<ThinkingPhaseResult> ExecuteThinkingPhaseAsync(CancellationToken cancellationToken)
     {
@@ -136,6 +140,10 @@ public class Orchestrator(
         return new ThinkingPhaseResult(toolCalls, finishReason);
     }
 
+    #endregion
+
+    #region Phase 3: Acting
+
     private async Task<IReadOnlyList<ToolExecutionResult>> ExecuteActingPhaseAsync(IReadOnlyList<ToolCall> toolCalls, CancellationToken cancellationToken)
     {
         _session.TransitionTo(SessionState.Acting);
@@ -144,52 +152,6 @@ public class Orchestrator(
 
         IReadOnlyList<Task<ToolExecutionResult>> executionTasks = [.. toolCalls.Select(toolCall => ExecuteToolAsync(toolCall, cancellationToken))];
         return await Task.WhenAll(executionTasks);
-    }
-
-    private async Task ExecuteObservingPhaseAsync(IReadOnlyList<ToolExecutionResult> toolResults, CancellationToken cancellationToken)
-    {
-        _session.TransitionTo(SessionState.Observing);
-        _session.AppendTurn(new ToolResultMessage(toolResults));
-        await sessionStore.SaveAsync(cancellationToken);
-        _session.TransitionTo(SessionState.Thinking);
-    }
-
-    private async Task CompleteCycleAsync(CancellationToken cancellationToken)
-    {
-        _session.TransitionTo(SessionState.Done);
-        await sessionStore.SaveAsync(cancellationToken);
-    }
-
-    private async Task FinaliseCycleAsync(CancellationToken cancellationToken)
-    {
-        _session.TransitionTo(SessionState.Idle);
-
-        eventPublisher.Publish(new SquashingBranchEvent());
-
-        string summary = await branchSquasher.SquashAsync(_session, cancellationToken);
-        _session.SquashBranch(summary, BranchStatus.Completed);
-        _session.UpdateIntent(string.Empty);
-        await sessionStore.SaveAsync(cancellationToken);
-
-        SessionProgress progress = _session.GetProgress();
-        eventPublisher.Publish(new CycleCompletedEvent(progress.Objective, progress.Milestones));
-    }
-
-    private IReadOnlyList<string> GetPreviousToolNames()
-    {
-        if (_session.GetLastMessage() is ToolResultMessage previousToolResultMessage)
-        {
-            List<string> names = new(previousToolResultMessage.Results.Count);
-
-            for (int i = 0; i < previousToolResultMessage.Results.Count; i++)
-            {
-                names.Add(previousToolResultMessage.Results[i].ToolName);
-            }
-
-            return names;
-        }
-
-        return [];
     }
 
     private async Task<ToolExecutionResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken)
@@ -232,6 +194,64 @@ public class Orchestrator(
         }
     }
 
+    #endregion
+
+    #region Phase 4: Observing
+
+    private async Task ExecuteObservingPhaseAsync(IReadOnlyList<ToolExecutionResult> toolResults, CancellationToken cancellationToken)
+    {
+        _session.TransitionTo(SessionState.Observing);
+        _session.AppendTurn(new ToolResultMessage(toolResults));
+        await sessionStore.SaveAsync(cancellationToken);
+        _session.TransitionTo(SessionState.Thinking);
+    }
+
+    #endregion
+
+    #region Phase 5: Finalise
+
+    private async Task CompleteCycleAsync(CancellationToken cancellationToken)
+    {
+        _session.TransitionTo(SessionState.Done);
+        await sessionStore.SaveAsync(cancellationToken);
+    }
+
+    private async Task FinaliseCycleAsync(CancellationToken cancellationToken)
+    {
+        _session.TransitionTo(SessionState.Idle);
+
+        eventPublisher.Publish(new SquashingBranchEvent());
+
+        string summary = await branchSquasher.SquashAsync(_session, cancellationToken);
+        _session.SquashBranch(summary, BranchStatus.Completed);
+        _session.UpdateIntent(string.Empty);
+        await sessionStore.SaveAsync(cancellationToken);
+
+        SessionProgress progress = _session.GetProgress();
+        eventPublisher.Publish(new CycleCompletedEvent(progress.Objective, progress.Milestones));
+    }
+
+    #endregion
+
+    #region Helpers & Inner Types
+
+    private IReadOnlyList<string> GetPreviousToolNames()
+    {
+        if (_session.GetLastMessage() is ToolResultMessage previousToolResultMessage)
+        {
+            List<string> names = new(previousToolResultMessage.Results.Count);
+
+            for (int i = 0; i < previousToolResultMessage.Results.Count; i++)
+            {
+                names.Add(previousToolResultMessage.Results[i].ToolName);
+            }
+
+            return names;
+        }
+
+        return [];
+    }
+
     private sealed record ThinkingPhaseResult(
         IReadOnlyList<ToolCall> ToolCalls,
         AgentFinishReason? FinishReason)
@@ -246,4 +266,6 @@ public class Orchestrator(
         public StringBuilder Name { get; } = new();
         public StringBuilder Args { get; } = new();
     }
+
+    #endregion
 }

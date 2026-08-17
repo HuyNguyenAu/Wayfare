@@ -1,10 +1,59 @@
-namespace Wayfare.Core.Models;
-
+using System.Text.Json.Serialization;
 using Wayfare.Core.Abstractions;
 using Wayfare.Core.Models.Ast;
 using Wayfare.Core.Models.Messages;
 
-internal class Session : ISession
+namespace Wayfare.Core.Models;
+
+#region Session Enums & DTOs
+
+/// <summary>
+/// Operational states of the agent execution cycle.
+/// </summary>
+public enum SessionState
+{
+    Idle,
+    Thinking,
+    Acting,
+    Observing,
+    Done,
+}
+
+/// <summary>
+/// Lifecycle status of an AST branch.
+/// </summary>
+public enum BranchStatus
+{
+    Active,
+    Completed,
+    Abandoned,
+}
+
+/// <summary>
+/// Summary of current objective and squashed milestones.
+/// </summary>
+public record SessionProgress(string Objective, IReadOnlyList<string> Milestones);
+
+/// <summary>
+/// Outcome of a tool execution.
+/// </summary>
+public sealed record ToolExecutionResult(
+    bool Success,
+    string DisplayMessage,
+    string Result,
+    string Error,
+    [property: JsonIgnore] Exception? Exception = null,
+    string ToolId = "",
+    string ToolName = "");
+
+#endregion
+
+#region Session Implementation
+
+/// <summary>
+/// Default in-memory session implementation managing history nodes.
+/// </summary>
+public class Session : ISession
 {
     private readonly List<HistoryNode> _history = [];
 
@@ -56,8 +105,6 @@ internal class Session : ISession
         string objective = string.IsNullOrWhiteSpace(Intent) ? "Awaiting directive..." : Intent;
         List<string> milestones = [.. _history.OfType<BranchNode>().Select(branch => branch.Summary)];
 
-
-
         return new SessionProgress(objective, milestones.AsReadOnly());
     }
 
@@ -76,3 +123,5 @@ internal class Session : ISession
         return branchNode;
     }
 }
+
+#endregion

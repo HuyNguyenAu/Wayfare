@@ -8,7 +8,7 @@ using Wayfare.Core.Models;
 using Wayfare.Core.Models.Ast;
 using Wayfare.Core.Models.Messages;
 
-internal sealed class InspectMilestoneTool(ISession session) : ITool
+public sealed class InspectMilestoneTool(ISession session) : ITool
 {
     public string Name => "inspect_milestone";
     public string DisplayName => "Inspect Milestone";

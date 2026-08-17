@@ -9,6 +9,8 @@ using Wayfare.Core.Prompts;
 
 public class BranchSquasher(IChatClient chatClient) : IBranchSquasher
 {
+    #region Public API
+
     public async Task<string> SquashAsync(ISession session, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -26,6 +28,10 @@ public class BranchSquasher(IChatClient chatClient) : IBranchSquasher
         ChatCompletionResult summary = await chatClient.CompleteChatAsync(messages, [], cancellationToken);
         return summary.Content.Trim();
     }
+
+    #endregion
+
+    #region Internal Trace Formatting Helpers
 
     private static string BuildTraceString(BranchNode activeBranch)
     {
@@ -68,4 +74,6 @@ public class BranchSquasher(IChatClient chatClient) : IBranchSquasher
 
         return traceBuilder.ToString();
     }
+
+    #endregion
 }
