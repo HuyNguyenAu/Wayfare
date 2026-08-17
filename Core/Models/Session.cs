@@ -9,11 +9,12 @@ internal class Session : ISession
     private readonly List<HistoryNode> _history = [];
 
     public SessionState State { get; private set; } = SessionState.Idle;
+    public string Intent { get; private set; } = string.Empty;
     public IReadOnlyList<HistoryNode> History => _history.AsReadOnly();
 
     public void StartBranch()
     {
-        _history.Add(new BranchNode(string.Empty, []));
+        _history.Add(new BranchNode(string.Empty, [], BranchStatus.Active));
     }
 
     public void AppendTurn(SessionMessage message)
@@ -22,10 +23,22 @@ internal class Session : ISession
         GetActiveBranch().Turns.Add(new TurnNode(message));
     }
 
-    public void SquashBranch(string summary)
+    public void SquashBranch(string summary, BranchStatus status)
     {
+        ArgumentNullException.ThrowIfNull(summary);
+
         BranchNode lastBranchNode = GetActiveBranch();
-        _history[^1] = lastBranchNode with { Summary = summary };
+        _history[^1] = lastBranchNode with
+        {
+            Summary = summary,
+            Status = status
+        };
+    }
+
+    public void UpdateIntent(string intent)
+    {
+        ArgumentNullException.ThrowIfNull(intent);
+        Intent = intent;
     }
 
     public SessionMessage GetLastMessage()
@@ -40,11 +53,10 @@ internal class Session : ISession
             return new SessionProgress(string.Empty, []);
         }
 
-        string objective = _history[0] is BranchNode firstBranch && firstBranch.Turns.Count > 0 && firstBranch.Turns[0].Message is UserMessage userMessage
-            ? userMessage.Content
-            : string.Empty;
+        string objective = string.IsNullOrWhiteSpace(Intent) ? "Awaiting directive..." : Intent;
+        List<string> milestones = [.. _history.OfType<BranchNode>().Select(branch => branch.Summary)];
 
-        List<string> milestones = [.. _history.OfType<BranchNode>().Select(b => b.Summary)];
+
 
         return new SessionProgress(objective, milestones.AsReadOnly());
     }

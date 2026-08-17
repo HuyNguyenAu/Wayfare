@@ -1,6 +1,6 @@
-using System.Text;
-
 namespace Wayfare.Core.Prompts;
+
+using System.Text;
 
 public static class SquashPromptBuilder
 {
@@ -20,3 +20,4 @@ public static class SquashPromptBuilder
         return promptBuilder.ToString();
     }
 }
+

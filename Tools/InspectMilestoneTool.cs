@@ -36,9 +36,12 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
 
         foreach (HistoryNode node in session.History)
         {
-            if (node is BranchNode branchNode && branchNode.Id == targetId)
+            if (node is BranchNode branchNode && (
+                branchNode.Id.Equals(targetId, StringComparison.OrdinalIgnoreCase) ||
+                branchNode.Id.StartsWith(targetId, StringComparison.OrdinalIgnoreCase)))
             {
                 matchedBranch = branchNode;
+                break;
             }
         }
 
@@ -56,6 +59,7 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
 
         StringBuilder output = new();
         output.AppendLine($"Milestone [{matchedBranch.Id}]");
+        output.AppendLine($"Status: {matchedBranch.Status}");
         output.AppendLine($"Created At: {matchedBranch.CreatedAt:yyyy-MM-dd HH:mm:ss UTC}");
         output.AppendLine($"Summary: {(string.IsNullOrWhiteSpace(matchedBranch.Summary) ? "(Active / Unsquashed)" : matchedBranch.Summary)}");
         output.AppendLine("Turns:");

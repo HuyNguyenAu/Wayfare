@@ -1,10 +1,11 @@
+namespace Wayfare.Core;
+
 using System.Text;
 using Wayfare.Core.Abstractions;
 using Wayfare.Core.Events;
 using Wayfare.Core.Models;
+using Wayfare.Core.Models.Ast;
 using Wayfare.Core.Models.Messages;
-
-namespace Wayfare.Core;
 
 public interface IOrchestrator
 {
@@ -17,7 +18,9 @@ public class Orchestrator(
     ISessionStore sessionStore,
     IEventPublisher eventPublisher,
     IBranchSquasher branchSquasher,
-    IMessagePromptBuilder messagePromptBuilder) : IOrchestrator
+    IMessagePromptBuilder messagePromptBuilder,
+    IIntentResolver intentResolver,
+    IPivotDetector pivotDetector) : IOrchestrator
 {
     private readonly ISession _session = sessionStore.Session;
 
@@ -47,12 +50,28 @@ public class Orchestrator(
 
     private async Task InitialiseCycleAsync(string userInput, CancellationToken cancellationToken)
     {
+        if (pivotDetector.IsPivot(userInput) && HasActiveUnsquashedBranch(_session))
+        {
+            _session.SquashBranch($"Abandoned: {_session.Intent}. Reason: User pivoted to '{userInput}'.", BranchStatus.Abandoned);
+        }
+
+        string resolvedIntent = await intentResolver.ResolveAsync(_session.Intent, userInput, cancellationToken);
+        _session.UpdateIntent(resolvedIntent);
         _session.StartBranch();
         _session.TransitionTo(SessionState.Thinking);
 
         UserMessage userMessage = new(userInput);
         _session.AppendTurn(userMessage);
         await sessionStore.SaveAsync(cancellationToken);
+    }
+
+
+    private static bool HasActiveUnsquashedBranch(ISession session)
+    {
+        return session.History.Count > 0 &&
+               session.History[^1] is BranchNode branch &&
+               string.IsNullOrWhiteSpace(branch.Summary) &&
+               branch.Turns.Count > 0;
     }
 
     private async Task<ThinkingPhaseResult> ExecuteThinkingPhaseAsync(CancellationToken cancellationToken)
@@ -64,7 +83,7 @@ public class Orchestrator(
         Dictionary<int, ToolCallBuilder> toolCallBuilders = [];
         AgentFinishReason? finishReason = null;
 
-        IReadOnlyList<SessionMessage> messages = messagePromptBuilder.BuildMessages(toolManager.Tools, _session.History);
+        IReadOnlyList<SessionMessage> messages = messagePromptBuilder.BuildMessages(toolManager.Tools, _session.History, _session.Intent);
 
         await foreach (StreamingChatUpdate update in chatClient.StreamChatAsync(messages, toolManager.Tools, cancellationToken))
         {
@@ -148,7 +167,8 @@ public class Orchestrator(
         eventPublisher.Publish(new SquashingBranchEvent());
 
         string summary = await branchSquasher.SquashAsync(_session, cancellationToken);
-        _session.SquashBranch(summary);
+        _session.SquashBranch(summary, BranchStatus.Completed);
+        _session.UpdateIntent(string.Empty);
         await sessionStore.SaveAsync(cancellationToken);
 
         SessionProgress progress = _session.GetProgress();
@@ -199,13 +219,13 @@ public class Orchestrator(
                 eventPublisher.Publish(new ToolExecutionStartedEvent(message));
             }
 
-            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolName, $"An error occurred: {ex.Message}", string.Empty, ex.ToString()));
+            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolName, $"An error occurred: {ex.Message}", string.Empty, ex.Message));
 
             return new ToolExecutionResult(
                 Success: false,
                 DisplayMessage: $"An error occurred: {ex.Message}",
                 Result: string.Empty,
-                Error: $"Exception occurred while executing tool '{toolName}' because {ex}",
+                Error: $"Exception occurred while executing tool '{toolName}': {ex.Message}",
                 ToolId: toolCall.ToolId,
                 ToolName: toolName,
                 Exception: ex);

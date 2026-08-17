@@ -1,16 +1,15 @@
+namespace Wayfare;
+
 using System.ClientModel;
 using Wayfare.Core;
 using Wayfare.Core.Events;
+using Wayfare.Core.Prompts;
 using Wayfare.Infrastructure.Clients;
 using Wayfare.Infrastructure.Configuration;
 using Wayfare.Infrastructure.Events;
 using Wayfare.Persistence;
 using Wayfare.Tools;
 using Wayfare.UI;
-
-using Wayfare.Core.Prompts;
-
-namespace Wayfare;
 
 public class Program
 {
@@ -58,7 +57,9 @@ public class Program
 
         BranchSquasher branchSquasher = new(openAIClient);
         MessagePromptBuilder messagePromptBuilder = new();
-        Orchestrator orchestrator = new(openAIClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder);
+        IntentResolver intentResolver = new(openAIClient);
+        PivotDetector pivotDetector = new();
+        Orchestrator orchestrator = new(openAIClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, intentResolver, pivotDetector);
 
         try
         {
