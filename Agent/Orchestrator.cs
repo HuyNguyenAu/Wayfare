@@ -6,6 +6,7 @@ using Microsoft.Extensions.AI;
 using Wayfare.Infrastructure.AI;
 using Wayfare.Infrastructure.Events;
 using Wayfare.Session;
+using Wayfare.Session.Inspection;
 using Wayfare.Tools;
 
 public sealed class Orchestrator(
@@ -16,7 +17,8 @@ public sealed class Orchestrator(
     IBranchSquasher branchSquasher,
     IMessagePromptBuilder messagePromptBuilder,
     IPivotDetector pivotDetector,
-    ICircuitBreaker circuitBreaker) : IOrchestrator
+    ICircuitBreaker circuitBreaker,
+    ISessionInspector sessionInspector) : IOrchestrator
 {
     private readonly IChatClient _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
     private readonly IToolManager _toolManager = toolManager ?? throw new ArgumentNullException(nameof(toolManager));
@@ -26,6 +28,7 @@ public sealed class Orchestrator(
     private readonly IMessagePromptBuilder _messagePromptBuilder = messagePromptBuilder ?? throw new ArgumentNullException(nameof(messagePromptBuilder));
     private readonly IPivotDetector _pivotDetector = pivotDetector ?? throw new ArgumentNullException(nameof(pivotDetector));
     private readonly ICircuitBreaker _circuitBreaker = circuitBreaker ?? throw new ArgumentNullException(nameof(circuitBreaker));
+    private readonly ISessionInspector _sessionInspector = sessionInspector ?? throw new ArgumentNullException(nameof(sessionInspector));
     private readonly ISession _session = (sessionStore ?? throw new ArgumentNullException(nameof(sessionStore))).Session;
 
     public async Task RunCycleAsync(string userInput, CancellationToken cancellationToken)
@@ -79,7 +82,7 @@ public sealed class Orchestrator(
     private static bool HasActiveUnsquashedBranch(ISession session)
     {
         return session.History.Count > 0 &&
-               session.History[^1] is BranchNode branch &&
+               session.History[^1] is BranchContainerNode branch &&
                string.IsNullOrWhiteSpace(branch.Summary) &&
                branch.Turns.Count > 0;
     }
@@ -253,26 +256,15 @@ public sealed class Orchestrator(
         _session.SquashBranch(summary, BranchStatus.Completed);
         await _sessionStore.SaveAsync(cancellationToken);
 
+        SessionAuditReport auditReport = _sessionInspector.GenerateAuditReport(_session);
         SessionProgress progress = _session.GetProgress();
-        _eventPublisher.Publish(new CycleCompletedEvent(progress.Milestones));
+        _eventPublisher.Publish(new CycleCompletedEvent(progress.Milestones, auditReport));
     }
 
-    private IReadOnlyList<string> GetPreviousToolNames()
-    {
-        if (_session.GetLastMessage() is ToolResultMessage previousToolResultMessage)
-        {
-            List<string> previousToolNames = new(previousToolResultMessage.Results.Count);
-
-            for (int resultIndex = 0; resultIndex < previousToolResultMessage.Results.Count; resultIndex++)
-            {
-                previousToolNames.Add(previousToolResultMessage.Results[resultIndex].ToolName);
-            }
-
-            return previousToolNames;
-        }
-
-        return [];
-    }
+    private IReadOnlyList<string> GetPreviousToolNames() =>
+        _session.GetLastMessage() is ToolResultMessage toolResult
+            ? [.. toolResult.Results.Select(r => r.ToolName)]
+            : [];
 
     private sealed record ThinkingPhaseResult(
         IReadOnlyList<ToolCall> ToolCalls,

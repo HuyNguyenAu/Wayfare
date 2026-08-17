@@ -2,6 +2,7 @@ namespace Wayfare.Agent;
 
 using System.Text;
 using Wayfare.Session;
+using Wayfare.Session.Projection;
 
 public static class SystemPromptBuilder
 {
@@ -23,25 +24,29 @@ public static class SystemPromptBuilder
     }
 }
 
-public sealed class MessagePromptBuilder : IMessagePromptBuilder
+public sealed class MessagePromptBuilder(ISessionProjector projector) : IMessagePromptBuilder
 {
+    private readonly ISessionProjector _projector = projector ?? throw new ArgumentNullException(nameof(projector));
+
+    public MessagePromptBuilder() : this(new SessionProjector())
+    {
+    }
+
     public IReadOnlyList<SessionMessage> BuildMessages(IReadOnlyList<HistoryNode> history)
     {
         ArgumentNullException.ThrowIfNull(history);
 
-        if (history.Count == 0 || history[^1] is not BranchNode activeBranch)
+        if (history.Count == 0 || history[^1] is not BranchContainerNode activeBranch)
         {
-            throw new InvalidOperationException($"Session history must contain at least one {nameof(BranchNode)}.");
+            throw new InvalidOperationException($"Session history must contain at least one {nameof(BranchContainerNode)}.");
         }
 
         List<SessionMessage> messages = [
             new SystemMessage(SystemPromptBuilder.Build())
         ];
 
-        foreach (TurnNode turn in activeBranch.Turns)
-        {
-            messages.Add(turn.Message);
-        }
+        IReadOnlyList<SessionMessage> projectedTurns = _projector.ProjectMessages(activeBranch.Turns);
+        messages.AddRange(projectedTurns);
 
         return messages.AsReadOnly();
     }

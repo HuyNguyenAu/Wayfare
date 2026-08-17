@@ -4,16 +4,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Wayfare.Infrastructure.Configuration;
 
-public sealed class ToolHelpers : IToolHelpers
+public sealed class ToolHelpers(IReadOnlyList<string> excludedDirectories) : IToolHelpers
 {
     public static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-    private readonly HashSet<string> _excludedDirectories;
-
-    public ToolHelpers(IReadOnlyList<string> excludedDirectories)
-    {
-        ArgumentNullException.ThrowIfNull(excludedDirectories);
-        _excludedDirectories = new HashSet<string>(excludedDirectories, StringComparer.OrdinalIgnoreCase);
-    }
+    private readonly HashSet<string> _excludedDirectories = new(
+        excludedDirectories ?? throw new ArgumentNullException(nameof(excludedDirectories)),
+        StringComparer.OrdinalIgnoreCase);
 
     public bool IsPathIgnored(string relativePath)
     {

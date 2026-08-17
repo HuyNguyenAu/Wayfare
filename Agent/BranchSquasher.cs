@@ -12,9 +12,9 @@ public sealed class BranchSquasher(IChatClient chatClient) : IBranchSquasher
     {
         ArgumentNullException.ThrowIfNull(session);
 
-        if (session.History.Count == 0 || session.History[^1] is not BranchNode activeBranch)
+        if (session.History.Count == 0 || session.History[^1] is not BranchContainerNode activeBranch)
         {
-            throw new InvalidOperationException($"Cannot squash active branch because session history does not end with a {nameof(BranchNode)}.");
+            throw new InvalidOperationException($"Cannot squash active branch because session history does not end with a {nameof(BranchContainerNode)}.");
         }
 
         List<ChatMessage> messages = [
@@ -38,14 +38,14 @@ public sealed class BranchSquasher(IChatClient chatClient) : IBranchSquasher
         return summary;
     }
 
-    private static string BuildTraceString(BranchNode activeBranch)
+    private static string BuildTraceString(BranchContainerNode activeBranch)
     {
         StringBuilder traceBuilder = new();
         traceBuilder.AppendLine("<trace>");
 
-        foreach (TurnNode turn in activeBranch.Turns)
+        foreach (HistoryNode turn in activeBranch.Turns)
         {
-            turn.Message.AppendTraceLines(traceBuilder);
+            turn.ToProjectedMessage().AppendTraceLines(traceBuilder);
         }
 
         traceBuilder.Append("</trace>");
@@ -53,4 +53,3 @@ public sealed class BranchSquasher(IChatClient chatClient) : IBranchSquasher
         return traceBuilder.ToString();
     }
 }
-

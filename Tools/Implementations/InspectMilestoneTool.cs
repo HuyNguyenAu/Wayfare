@@ -1,5 +1,6 @@
 namespace Wayfare.Tools.Implementations;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,17 +13,17 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
 
     public string Name => "inspect_milestone";
     public string DisplayName => "Inspect Milestone";
-    public string Description => "Inspect details of a past milestone including all turns. Parameters: id (string, required).";
+    public string Description => "Inspect details and compressed turns of a past milestone. Parameters: id (string, required).";
 
     public ToolSchema Parameters => ToolSchema.Object(new Dictionary<string, ToolPropertySchema>
     {
         ["id"] = ToolPropertySchema.String("The milestone ID or milestone ID prefix to inspect.")
-    });
+    }, required: ["id"]);
 
     public string GetInvocationMessage(string arguments)
     {
-        return TryParseId(arguments, out string? id)
-            ? $"[{DisplayName}] [{id}]"
+        return TryParseArguments(arguments, out InspectMilestoneArguments? parsed)
+            ? $"[{DisplayName}] [{parsed.Id}]"
             : $"[{DisplayName}] [{arguments}]";
     }
 
@@ -31,7 +32,7 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
         string availableIds = _session.History.Count > 0 ?
             string.Join(", ", _session.History.Select(branch => branch.Id)) : "None";
 
-        if (string.IsNullOrWhiteSpace(arguments) || !TryParseId(arguments, out string? targetId) || string.IsNullOrWhiteSpace(targetId))
+        if (string.IsNullOrWhiteSpace(arguments) || !TryParseArguments(arguments, out InspectMilestoneArguments? args) || string.IsNullOrWhiteSpace(args.Id))
         {
             return Task.FromResult(new ToolExecutionResult(
                 Success: false,
@@ -40,11 +41,12 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
                 Error: $"Failed to inspect milestone: 'id' parameter is required. Available milestone IDs in session: [{availableIds}]. Usage: {{\"id\": \"<milestone_id>\"}}"));
         }
 
-        BranchNode? matchedBranch = null;
+        string targetId = args.Id;
+        BranchContainerNode? matchedBranch = null;
 
         foreach (HistoryNode node in _session.History)
         {
-            if (node is BranchNode branchNode && (
+            if (node is BranchContainerNode branchNode && (
                 branchNode.Id.Equals(targetId, StringComparison.OrdinalIgnoreCase) ||
                 branchNode.Id.StartsWith(targetId, StringComparison.OrdinalIgnoreCase)))
             {
@@ -67,7 +69,7 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
         output.AppendLine($"Status: {matchedBranch.Status}");
         output.AppendLine($"Created At: {matchedBranch.CreatedAt:yyyy-MM-dd HH:mm:ss UTC}");
         output.AppendLine($"Summary: {(string.IsNullOrWhiteSpace(matchedBranch.Summary) ? "(Active / Unsquashed)" : matchedBranch.Summary)}");
-        output.AppendLine("Turns:");
+        output.AppendLine("Turns (Compressed Milestone Turns):");
 
         if (matchedBranch.Turns.Count == 0)
         {
@@ -77,30 +79,29 @@ internal sealed class InspectMilestoneTool(ISession session) : ITool
         {
             for (int turnIndex = 0; turnIndex < matchedBranch.Turns.Count; turnIndex++)
             {
-                TurnNode turn = matchedBranch.Turns[turnIndex];
+                HistoryNode node = matchedBranch.Turns[turnIndex];
                 output.AppendLine($"--- Turn {turnIndex + 1} ---");
-                turn.Message.AppendTraceLines(output);
+                node.ToProjectedMessage().AppendTraceLines(output);
             }
         }
 
         return Task.FromResult(new ToolExecutionResult(
             Success: true,
-            DisplayMessage: $"Inspected milestone [{matchedBranch.Id}] ({matchedBranch.Turns.Count} turns).",
+            DisplayMessage: $"Inspected milestone [{matchedBranch.Id}] ({matchedBranch.Turns.Count} compressed turns).",
             Result: output.ToString(),
             Error: string.Empty));
     }
 
-    private static bool TryParseId(string arguments, out string? id)
+    private static bool TryParseArguments(string arguments, [NotNullWhen(true)] out InspectMilestoneArguments? parsed)
     {
         try
         {
-            InspectMilestoneArguments? parsedArguments = JsonSerializer.Deserialize<InspectMilestoneArguments>(arguments, ToolHelpers.JsonOptions);
-            id = parsedArguments?.Id;
-            return !string.IsNullOrWhiteSpace(id);
+            parsed = JsonSerializer.Deserialize<InspectMilestoneArguments>(arguments, ToolHelpers.JsonOptions);
+            return parsed is not null && !string.IsNullOrWhiteSpace(parsed.Id);
         }
         catch
         {
-            id = null;
+            parsed = null;
             return false;
         }
     }

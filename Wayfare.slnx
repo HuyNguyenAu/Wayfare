@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="Wayfare.csproj" />
+  <Project Path="Wayfare.Tests/Wayfare.Tests.csproj" />
 </Solution>

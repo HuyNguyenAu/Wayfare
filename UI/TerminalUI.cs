@@ -6,7 +6,7 @@ using Spectre.Console;
 using Wayfare.Infrastructure.Events;
 using Wayfare.UI.Components;
 
-public sealed class TerminalUI : ITerminalUI, IAsyncDisposable
+public sealed class TerminalUI : ITerminalUI, IEventSink, IAsyncDisposable
 {
     private bool _disposed;
     private bool _hasPrompted;
@@ -17,7 +17,6 @@ public sealed class TerminalUI : ITerminalUI, IAsyncDisposable
     private readonly ThinkingStreamRenderer _thinkingStreamRenderer;
     private readonly MarkdownStreamRenderer _markdownStreamRenderer;
     private readonly TaskCompletionSource _agentReadyTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly Dictionary<Type, Func<IEvent, CancellationToken, Task>> _eventHandlers;
 
     public TerminalUI(IEventBroker eventBroker, CancellationToken cancellationToken)
     {
@@ -29,30 +28,118 @@ public sealed class TerminalUI : ITerminalUI, IAsyncDisposable
         Console.OutputEncoding = Encoding.UTF8;
         AnsiConsole.Clear();
 
-        _eventHandlers = new()
-        {
-            [typeof(StartupStartedEvent)] = (_, _) => { ProgressRenderer.RenderStartupStarted(); return Task.CompletedTask; },
-            [typeof(StartupCompletedEvent)] = (_, _) => { ProgressRenderer.RenderStartupCompleted(); return Task.CompletedTask; },
-            [typeof(AgentStartedEvent)] = (_, _) => { ProgressRenderer.RenderStartAgent(); _agentReadyTaskCompletionSource.TrySetResult(); return Task.CompletedTask; },
-            [typeof(ToolCompilationStartedEvent)] = (eventInstance, _) => { EnsureToolsHeaderRendered(); ProgressRenderer.RenderToolCompilationStarted(((ToolCompilationStartedEvent)eventInstance).ToolName); return Task.CompletedTask; },
-            [typeof(ToolCompilationCompletedEvent)] = (_, _) => { ProgressRenderer.RenderToolCompilationCompleted(); return Task.CompletedTask; },
-            [typeof(ToolCompilationFailedEvent)] = (eventInstance, _) => { EnsureToolsHeaderRendered(); ToolCompilationFailedEvent failedEvent = (ToolCompilationFailedEvent)eventInstance; ProgressRenderer.RenderToolCompilationFailed(failedEvent.ToolName, failedEvent.Error); return Task.CompletedTask; },
-            [typeof(ToolLoadingStartedEvent)] = (eventInstance, _) => { EnsureToolsHeaderRendered(); ProgressRenderer.RenderToolLoadingStarted(((ToolLoadingStartedEvent)eventInstance).ToolName); return Task.CompletedTask; },
-            [typeof(ToolLoadingCompletedEvent)] = (_, _) => { ProgressRenderer.RenderToolLoadingCompleted(); return Task.CompletedTask; },
-            [typeof(ToolLoadingFailedEvent)] = (eventInstance, _) => { EnsureToolsHeaderRendered(); ToolLoadingFailedEvent loadingFailedEvent = (ToolLoadingFailedEvent)eventInstance; ProgressRenderer.RenderToolLoadingFailed(loadingFailedEvent.ToolName, loadingFailedEvent.Error); return Task.CompletedTask; },
-            [typeof(ChatRequestStartedEvent)] = (eventInstance, cancellationToken) => { ChatRequestStartedEvent chatStartedEvent = (ChatRequestStartedEvent)eventInstance; ProgressRenderer.RenderChatRequestStarted(chatStartedEvent.ToolNames); _thinkingStreamRenderer.StartStream(); _markdownStreamRenderer.StartStream(cancellationToken); return Task.CompletedTask; },
-            [typeof(ChatRequestCompletedEvent)] = async (_, _) => { await _thinkingStreamRenderer.CompleteStreamAsync(); await _markdownStreamRenderer.CompleteStreamAsync(); },
-            [typeof(ThinkingChunkReceivedEvent)] = async (eventInstance, cancellationToken) => { ThinkingChunkReceivedEvent thinkingEvent = (ThinkingChunkReceivedEvent)eventInstance; await _thinkingStreamRenderer.AppendChunkAsync(thinkingEvent.Content, cancellationToken); _markdownStreamRenderer.HeaderCompleted = true; },
-            [typeof(TokenChunkReceivedEvent)] = async (eventInstance, cancellationToken) => { TokenChunkReceivedEvent tokenEvent = (TokenChunkReceivedEvent)eventInstance; await _thinkingStreamRenderer.CompleteStreamAsync(); await _markdownStreamRenderer.AppendChunkAsync(tokenEvent.Content, cancellationToken); },
-            [typeof(ToolExecutionStartedEvent)] = (eventInstance, _) => { ToolExecutionStartedEvent executionStartedEvent = (ToolExecutionStartedEvent)eventInstance; ProgressRenderer.RenderToolExecutionStarted(executionStartedEvent.InvocationMessage); return Task.CompletedTask; },
-            [typeof(ToolExecutionCompletedEvent)] = (eventInstance, _) => { ToolExecutionCompletedEvent executionCompletedEvent = (ToolExecutionCompletedEvent)eventInstance; ProgressRenderer.RenderToolExecutionCompleted(executionCompletedEvent.Success, executionCompletedEvent.DisplayMessage); return Task.CompletedTask; },
-            [typeof(SquashingBranchEvent)] = (_, _) => { ProgressRenderer.RenderSquashingBranch(); return Task.CompletedTask; },
-            [typeof(CycleCompletedEvent)] = (eventInstance, _) => { CycleCompletedEvent cycleCompletedEvent = (CycleCompletedEvent)eventInstance; ProgressRenderer.RenderMilestones(cycleCompletedEvent.Milestones); return Task.CompletedTask; },
-        };
-
         _eventLoopTask = Task.Run(() => ProcessEventsAsync(cancellationToken), cancellationToken);
     }
 
+    public Task HandleAsync(StartupStartedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderStartupStarted();
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(StartupCompletedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderStartupCompleted();
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(AgentStartedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderStartAgent();
+        _agentReadyTaskCompletionSource.TrySetResult();
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ToolCompilationStartedEvent @event, CancellationToken cancellationToken)
+    {
+        EnsureToolsHeaderRendered();
+        ProgressRenderer.RenderToolCompilationStarted(@event.ToolName);
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ToolCompilationCompletedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderToolCompilationCompleted();
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ToolCompilationFailedEvent @event, CancellationToken cancellationToken)
+    {
+        EnsureToolsHeaderRendered();
+        ProgressRenderer.RenderToolCompilationFailed(@event.ToolName, @event.Error);
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ToolLoadingStartedEvent @event, CancellationToken cancellationToken)
+    {
+        EnsureToolsHeaderRendered();
+        ProgressRenderer.RenderToolLoadingStarted(@event.ToolName);
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ToolLoadingCompletedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderToolLoadingCompleted();
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ToolLoadingFailedEvent @event, CancellationToken cancellationToken)
+    {
+        EnsureToolsHeaderRendered();
+        ProgressRenderer.RenderToolLoadingFailed(@event.ToolName, @event.Error);
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ChatRequestStartedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderChatRequestStarted(@event.ToolNames);
+        _thinkingStreamRenderer.StartStream();
+        _markdownStreamRenderer.StartStream(cancellationToken);
+        return Task.CompletedTask;
+    }
+
+    public async Task HandleAsync(ChatRequestCompletedEvent @event, CancellationToken cancellationToken)
+    {
+        await _thinkingStreamRenderer.CompleteStreamAsync();
+        await _markdownStreamRenderer.CompleteStreamAsync();
+    }
+
+    public async Task HandleAsync(ThinkingChunkReceivedEvent @event, CancellationToken cancellationToken)
+    {
+        await _thinkingStreamRenderer.AppendChunkAsync(@event.Content, cancellationToken);
+        _markdownStreamRenderer.HeaderCompleted = true;
+    }
+
+    public async Task HandleAsync(TokenChunkReceivedEvent @event, CancellationToken cancellationToken)
+    {
+        await _thinkingStreamRenderer.CompleteStreamAsync();
+        await _markdownStreamRenderer.AppendChunkAsync(@event.Content, cancellationToken);
+    }
+
+    public Task HandleAsync(ToolExecutionStartedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderToolExecutionStarted(@event.InvocationMessage);
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(ToolExecutionCompletedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderToolExecutionCompleted(@event.Success, @event.DisplayMessage);
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(SquashingBranchEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderSquashingBranch();
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(CycleCompletedEvent @event, CancellationToken cancellationToken)
+    {
+        ProgressRenderer.RenderMilestones(@event.Milestones);
+        ProgressRenderer.RenderAuditReport(@event.AuditReport);
+        return Task.CompletedTask;
+    }
 
     public async Task<string> GetUserInputAsync(CancellationToken cancellationToken)
     {
@@ -95,7 +182,7 @@ public sealed class TerminalUI : ITerminalUI, IAsyncDisposable
         {
             await foreach (IEvent @event in _eventBroker.ReadAllAsync(cancellationToken))
             {
-                await HandleEventAsync(@event, cancellationToken);
+                await @event.DispatchAsync(this, cancellationToken);
             }
         }
         catch (Exception exception) when (exception is OperationCanceledException or ChannelClosedException)
@@ -120,14 +207,6 @@ public sealed class TerminalUI : ITerminalUI, IAsyncDisposable
         {
             _hasRenderedToolsHeader = true;
             ProgressRenderer.RenderLoadingToolsStarted();
-        }
-    }
-
-    private async Task HandleEventAsync(IEvent @event, CancellationToken cancellationToken)
-    {
-        if (_eventHandlers.TryGetValue(@event.GetType(), out Func<IEvent, CancellationToken, Task>? handler))
-        {
-            await handler(@event, cancellationToken);
         }
     }
 

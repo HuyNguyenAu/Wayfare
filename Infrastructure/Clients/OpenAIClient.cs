@@ -6,12 +6,9 @@ using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Wayfare.Infrastructure.AI;
 
-public class OpenAIClient : DelegatingChatClient
+public sealed class OpenAIClient(IChatClient innerClient)
+    : DelegatingChatClient(innerClient ?? throw new ArgumentNullException(nameof(innerClient)))
 {
-    public OpenAIClient(IChatClient innerClient) : base(innerClient)
-    {
-        ArgumentNullException.ThrowIfNull(innerClient);
-    }
 
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> chatMessages,

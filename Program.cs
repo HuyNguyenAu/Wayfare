@@ -7,6 +7,8 @@ using Wayfare.Infrastructure.Clients;
 using Wayfare.Infrastructure.Configuration;
 using Wayfare.Infrastructure.Events;
 using Wayfare.Session;
+using Wayfare.Session.Inspection;
+using Wayfare.Session.Projection;
 using Wayfare.Tools;
 using Wayfare.Tools.Implementations;
 using Wayfare.UI;
@@ -50,6 +52,8 @@ public static class Program
         await using TerminalUI terminalUI = new(eventBroker, cancellationTokenSource.Token);
 
         await using SessionStore sessionStore = new(settings.SessionsDirectory);
+        SessionInspector sessionInspector = new();
+        SessionProjector sessionProjector = new();
         ToolHelpers toolHelpers = new(settings.ExcludedDirectories);
         InspectMilestoneTool inspectMilestoneTool = new(sessionStore.Session);
         ToolManager toolManager = new(eventBroker, [inspectMilestoneTool], toolHelpers);
@@ -72,10 +76,10 @@ public static class Program
         eventBroker.Publish(new AgentStartedEvent());
 
         BranchSquasher branchSquasher = new(chatClient);
-        MessagePromptBuilder messagePromptBuilder = new();
+        MessagePromptBuilder messagePromptBuilder = new(sessionProjector);
         PivotDetector pivotDetector = new();
         CircuitBreaker circuitBreaker = new(settings.MaxTurns);
-        Orchestrator orchestrator = new(chatClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, pivotDetector, circuitBreaker);
+        Orchestrator orchestrator = new(chatClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, pivotDetector, circuitBreaker, sessionInspector);
 
         try
         {

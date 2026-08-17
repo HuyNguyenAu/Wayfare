@@ -2,13 +2,7 @@ namespace Wayfare.Infrastructure.AI;
 
 using Microsoft.Extensions.AI;
 
-public sealed class ReasoningContent : AIContent
+public sealed class ReasoningContent(string text) : AIContent
 {
-    public ReasoningContent(string text)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        Text = text;
-    }
-
-    public string Text { get; }
+    public string Text { get; } = text ?? throw new ArgumentNullException(nameof(text));
 }

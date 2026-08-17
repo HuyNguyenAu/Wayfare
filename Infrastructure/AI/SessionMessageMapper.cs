@@ -66,11 +66,7 @@ public static class SessionMessageMapper
                     break;
 
                 case ToolCallMessage toolCallMessage:
-                    List<AIContent> callContents = [];
-                    foreach (ToolCall toolCall in toolCallMessage.ToolCalls)
-                    {
-                        callContents.Add(CreateFunctionCallContent(toolCall));
-                    }
+                    List<AIContent> callContents = [.. toolCallMessage.ToolCalls.Select(CreateFunctionCallContent)];
 
                     if (chatMessages.Count > 0 && chatMessages[^1].Role == ChatRole.Assistant)
                     {
@@ -88,10 +84,7 @@ public static class SessionMessageMapper
                 case ToolResultMessage toolResultMessage:
                     foreach (ToolExecutionResult result in toolResultMessage.Results)
                     {
-                        string resultText = result.Success
-                            ? (string.IsNullOrWhiteSpace(result.Result) ? $"Tool '{result.ToolName}' completed successfully with no output." : result.Result.Trim())
-                            : (string.IsNullOrWhiteSpace(result.Error) ? $"ERROR: Tool '{result.ToolName}' failed without an explicit error message. Verify tool parameters and check file paths with 'list' or 'find' before retrying." : (result.Error.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase) ? result.Error.Trim() : $"ERROR: {result.Error.Trim()}"));
-
+                        string resultText = FormatToolResult(result);
                         chatMessages.Add(new ChatMessage(ChatRole.Tool, [new FunctionResultContent(result.ToolId, resultText)]));
                     }
                     break;
@@ -102,6 +95,25 @@ public static class SessionMessageMapper
         }
 
         return chatMessages;
+    }
+
+    private static string FormatToolResult(ToolExecutionResult result)
+    {
+        if (result.Success)
+        {
+            return string.IsNullOrWhiteSpace(result.Result)
+                ? $"Tool '{result.ToolName}' completed successfully with no output."
+                : result.Result.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(result.Error))
+        {
+            return $"ERROR: Tool '{result.ToolName}' failed without an explicit error message. Verify tool parameters and check file paths with 'list' or 'find' before retrying.";
+        }
+
+        return result.Error.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase)
+            ? result.Error.Trim()
+            : $"ERROR: {result.Error.Trim()}";
     }
 
     private static FunctionCallContent CreateFunctionCallContent(ToolCall toolCall)

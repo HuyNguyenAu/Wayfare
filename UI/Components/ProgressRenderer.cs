@@ -1,6 +1,7 @@
 namespace Wayfare.UI.Components;
 
 using Spectre.Console;
+using Wayfare.Session.Inspection;
 
 public static class ProgressRenderer
 {
@@ -118,6 +119,23 @@ public static class ProgressRenderer
         {
             grid.AddRow(new Markup($"  [{ColourPalette.HexAlgaeLumens}]❦[/] [{ColourPalette.HexTerracottaSol}]NODE-{milestoneIndex + 1:D2}[/] [{ColourPalette.HexSporeDust}]{Markup.Escape(milestones[milestoneIndex].Trim())}[/]"));
         }
+
+        AnsiConsole.Write(grid);
+        AnsiConsole.WriteLine();
+    }
+
+    public static void RenderAuditReport(SessionAuditReport auditReport)
+    {
+        ArgumentNullException.ThrowIfNull(auditReport);
+
+        Grid grid = new();
+        grid.AddColumn();
+        grid.AddRow(new Markup($"[{ColourPalette.HexBiolumAzure} bold]{Markup.Escape("☵ CONTEXT LEDGER AUDIT & HARVEST METRICS:")}[/]"));
+
+        string compressionPercentage = $"{auditReport.CompressionRatio:P0}";
+        grid.AddRow(new Markup($"  [{ColourPalette.HexAlgaeLumens}]❦[/] [{ColourPalette.HexTerracottaSol}]Raw Turns:[/] [{ColourPalette.HexMyceliumLinen}]{auditReport.TotalRawTurns}[/]  •  [{ColourPalette.HexTerracottaSol}]Active Projected:[/] [{ColourPalette.HexMyceliumLinen}]{auditReport.ProjectedTurns}[/]  •  [{ColourPalette.HexTerracottaSol}]Compression Ratio:[/] [{ColourPalette.HexAlgaeLumens}]{compressionPercentage}[/]"));
+
+        grid.AddRow(new Markup($"  [{ColourPalette.HexSunlitOchre}]⑂[/] [{ColourPalette.HexSporeDust}]Shadowed Observations:[/] [{ColourPalette.HexMyceliumLinen}]{auditReport.ShadowedNodesCount}[/]  •  [{ColourPalette.HexSporeDust}]Collapsed Explorations:[/] [{ColourPalette.HexMyceliumLinen}]{auditReport.CollapsedGroupsCount} groups ({auditReport.TotalExploratoryNodesCollapsed} turns)[/]"));
 
         AnsiConsole.Write(grid);
         AnsiConsole.WriteLine();

@@ -4,22 +4,21 @@ using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Wayfare.Tools;
 
-public sealed class ToolAIFunction : AIFunction
+public sealed class ToolAIFunction(ITool tool) : AIFunction
 {
-    private readonly ITool _tool;
-    private readonly JsonElement _jsonSchema;
-
-    public ToolAIFunction(ITool tool)
-    {
-        ArgumentNullException.ThrowIfNull(tool);
-        _tool = tool;
-        using JsonDocument jsonDocument = JsonDocument.Parse(tool.Parameters.ToBinaryData());
-        _jsonSchema = jsonDocument.RootElement.Clone();
-    }
+    private readonly ITool _tool = tool ?? throw new ArgumentNullException(nameof(tool));
+    private readonly JsonElement _jsonSchema = ParseSchema(tool);
 
     public override string Name => _tool.Name;
     public override string Description => _tool.Description;
     public override JsonElement JsonSchema => _jsonSchema;
+
+    private static JsonElement ParseSchema(ITool tool)
+    {
+        ArgumentNullException.ThrowIfNull(tool);
+        using JsonDocument jsonDocument = JsonDocument.Parse(tool.Parameters.ToBinaryData());
+        return jsonDocument.RootElement.Clone();
+    }
 
     protected override async ValueTask<object?> InvokeCoreAsync(
         AIFunctionArguments arguments,

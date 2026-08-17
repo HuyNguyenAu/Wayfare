@@ -11,12 +11,21 @@ using Wayfare.Infrastructure.Events;
 
 public sealed class LoadToolException(string message, Exception? innerException = null) : Exception(message, innerException);
 
-public sealed class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> builtInTools, IToolHelpers toolHelpers) : IToolManager
+public sealed class ToolManager(
+    IEventPublisher eventPublisher,
+    IReadOnlyList<ITool> builtInTools,
+    IToolHelpers toolHelpers) : IToolManager
 {
+    private static readonly HashSet<string> _ignoreFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ITool.cs",
+        "ToolHelpers.cs",
+        "InspectMilestoneTool.cs"
+    };
+
     private readonly IEventPublisher _eventPublisher = eventPublisher ?? throw new ArgumentNullException(nameof(eventPublisher));
     private readonly IReadOnlyList<ITool> _builtInTools = builtInTools ?? throw new ArgumentNullException(nameof(builtInTools));
     private readonly IToolHelpers _toolHelpers = toolHelpers ?? throw new ArgumentNullException(nameof(toolHelpers));
-    private readonly string[] _ignoreFiles = ["ITool.cs", "ToolHelpers.cs", "InspectMilestoneTool.cs"];
 
     public IReadOnlyList<ITool> Tools { get; private set; } = [];
     public IReadOnlyList<Exception> Errors { get; private set; } = [];
@@ -106,15 +115,15 @@ public sealed class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<IT
             {
                 try
                 {
-                    eventPublisher.Publish(new ToolCompilationStartedEvent(toolName));
+                    _eventPublisher.Publish(new ToolCompilationStartedEvent(toolName));
                     await CompileToolAsync(toolFilePath, dllPath, cancellationToken);
-                    eventPublisher.Publish(new ToolCompilationCompletedEvent());
+                    _eventPublisher.Publish(new ToolCompilationCompletedEvent());
                 }
                 catch (Exception exception)
                 {
                     errors.Add(exception);
 
-                    eventPublisher.Publish(new ToolCompilationFailedEvent(toolName, exception.Message));
+                    _eventPublisher.Publish(new ToolCompilationFailedEvent(toolName, exception.Message));
 
                     if (File.Exists(dllPath))
                     {
@@ -139,17 +148,17 @@ public sealed class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<IT
 
             try
             {
-                eventPublisher.Publish(new ToolLoadingStartedEvent(toolName));
+                _eventPublisher.Publish(new ToolLoadingStartedEvent(toolName));
 
                 ITool tool = LoadTool(dllFilePath);
                 tools.Add(tool);
 
-                eventPublisher.Publish(new ToolLoadingCompletedEvent());
+                _eventPublisher.Publish(new ToolLoadingCompletedEvent());
             }
             catch (Exception exception)
             {
                 errors.Add(exception);
-                eventPublisher.Publish(new ToolLoadingFailedEvent(toolName, exception.Message));
+                _eventPublisher.Publish(new ToolLoadingFailedEvent(toolName, exception.Message));
             }
         }
 

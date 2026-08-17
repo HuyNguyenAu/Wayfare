@@ -4,17 +4,11 @@ using System.Diagnostics.CodeAnalysis;
 using Wayfare.Infrastructure.AI;
 using Wayfare.Tools;
 
-public sealed class CircuitBreaker : ICircuitBreaker
+public sealed class CircuitBreaker(int maxTurns = 15) : ICircuitBreaker
 {
-    private readonly int _maxTurns;
+    private readonly int _maxTurns = maxTurns > 0 ? maxTurns : throw new ArgumentOutOfRangeException(nameof(maxTurns), "maxTurns must be greater than zero.");
     private readonly HashSet<(string ToolName, string Arguments)> _previousTurnFailedCalls = [];
     private int _currentTurn = 0;
-
-    public CircuitBreaker(int maxTurns = 15)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTurns);
-        _maxTurns = maxTurns;
-    }
 
     public bool TryAdvanceTurn([NotNullWhen(false)] out string? reason)
     {

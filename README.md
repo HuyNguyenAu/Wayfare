@@ -1,43 +1,75 @@
 # WAYFARE // SOLAR BIOSPHERE v3.5
 
-> High-performance .NET 10 terminal-based AI coding assistant harness powered by Chlorophyll OS & VerdantAgent, an Abstract Syntax Tree (AST) Context model, dynamic Roslyn tool engine, and event-driven ReAct execution loop.
+> High-performance .NET 10 terminal-based AI coding assistant harness powered by Chlorophyll OS & VerdantAgent, an **Immutable Context Ledger with Projection Transforms**, dynamic Roslyn tool engine, and event-driven ReAct execution loop.
 
 ---
 
 ## Architecture Overview
 
-`Wayfare` organises conversation history into a structured **AST Context** model. Instead of feeding flat unorganised message logs to the LLM, `Wayfare` structures interaction history into explicit branches and discrete turn nodes.
+`Wayfare` structures interaction history into an **Immutable Context Ledger with Projection Transforms**. Instead of appending unorganised message logs to the LLM, `Wayfare` decouples conversation storage from inference context projection via an append-only tree topology, deterministic transformation pipeline, and linear context projector.
 
 ```mermaid
 graph TD
-    History["List<HistoryNode> (Session History)"]
-    BranchNode["BranchNode (Summary, Turns)"]
-    TurnNode["TurnNode (SessionMessage)"]
+    User([User Request]) --> Orch[Verdant Agent Orchestrator]
 
-    History --> BranchNode
-    BranchNode --> TurnNode
+    subgraph Ledger ["Immutable Context Ledger"]
+        direction TB
+        Tree["Append-Only History Tree<br/>(Raw Turns, Wrapped Transformation History)"]
+        Pipe["Transformation Pipeline<br/>(Write Shadowing & Diagnostic Collapse)"]
+        Proj["Linear Context Projector"]
+        
+        Tree --> Pipe
+        Pipe --> Proj
+    end
+
+    subgraph Loop ["ReAct Execution Loop"]
+        direction TB
+        LLM["LLM Inference<br/>(Streaming Reasoning & Tool Calls)"]
+        Tools["Dynamic Roslyn Tools<br/>(read, write, replace, list, find, execute)"]
+        
+        LLM -->|Tool Calls| Tools
+        Tools -->|Observations| Orch
+    end
+
+    subgraph Harvest ["Milestone Harvest & Presentation"]
+        direction TB
+        Squash["Branch Squasher<br/>(STARL Summary + Key Artifacts)"]
+        Inspector["Session Inspector<br/>(Transformation History & Audit Metrics)"]
+        UI["Solarpunk Terminal UI<br/>(Milestones & Compression Metrics)"]
+        
+        Squash --> UI
+        Inspector --> UI
+    end
+
+    Orch -->|Append Turns| Ledger
+    Proj -->|Optimized Context Buffer| LLM
+    Orch -->|Branch Completed| Harvest
 ```
 
 ### Key Architectural Pillars
 
-1. **Pure Domain AST Entities ([`Session/SessionModels.cs`](Session/SessionModels.cs)):**
-   - [`HistoryNode`](Session/SessionModels.cs): Abstract base record with polymorphic JSON serialisation attributes (`[JsonPolymorphic]`, `[JsonDerivedType]`).
-   - [`BranchNode`](Session/SessionModels.cs): Active working branch representing live tool execution turns and squashed milestone summaries.
-   - [`TurnNode`](Session/SessionModels.cs): Leaf node wrapping discrete domain messages (`UserMessage`, `AssistantMessage`, `ToolCallMessage`, `ToolResultMessage`).
-   - [`SessionProgress`](Session/SessionModels.cs): Lightweight summary record carrying harvested milestone summaries across cycles.
+1. **Immutable Node Tree & Wrapped Transformation History ([`Session/SessionModels.cs`](Session/SessionModels.cs)):**
+   - [`HistoryNode`](Session/SessionModels.cs): Abstract base record with polymorphic JSON serialisation attributes (`[JsonPolymorphic]`, `[JsonDerivedType]`), unique GUID v7 `Id`, UTC `CreatedAt`, and metadata.
+   - [`TurnNode`](Session/SessionModels.cs): Leaf node holding an immutable conversational turn (`SessionMessage`).
+   - [`SupersededStateNode`](Session/SessionModels.cs): Non-destructive wrapper enclosing a past node whose state was superseded by a subsequent write action, exposing a lightweight reference stub (`[Observation superseded by write to '{path}']`) while preserving the full target node across arbitrary nesting depth.
+   - [`CollapsedExplorationNode`](Session/SessionModels.cs): Bundles a contiguous sequence of ephemeral exploratory turns (`list`, `find`, diagnostic commands) into a single consolidated transaction node.
+   - [`BranchContainerNode`](Session/SessionModels.cs): Container encapsulating turns for active branches, ReAct iterations, and squashed milestone summaries.
 
-2. **Context Engineering ([`Agent/Prompts.cs`](Agent/Prompts.cs)):**
-   - **Positive XML Framing**: Replaces fragile negative prompt constraints with structured XML boundary markers (`<milestone_summary>`, `<observation>`).
+2. **Deterministic Transformation Pipeline ([`Session/Transformations/`](Session/Transformations/)):**
+   - **Write Shadowing (Superseded State Elimination)**: Scans write actions (`write`, `replace`), indexes mutated resources, and wraps past raw read/write observations in lightweight reference stubs.
+   - **Diagnostic Collapse (Ephemeral Action Pruning)**: Categorizes tool schemas into exploratory discovery versus persistent mutations, bundling preceding exploratory sequences upon completing terminal mutations.
+   - **Transformation History & Identity Invariants**: Persistent unique Node IDs across all transformations and support for arbitrary wrapping depth.
 
-3. **Branch Squashing ([`Agent/BranchSquasher.cs`](Agent/BranchSquasher.cs) & [`Agent/Prompts.cs`](Agent/Prompts.cs)):**
-   - Summarises completed active branches into STARL format (Situation, Task, Action, Result, Learnings) plus **Key Artifacts for Exact Invariants** (exact file paths, executed commands, and state guarantees) inside `<milestone_summary>` tags to prevent prompt token bloat while keeping precise technical context intact.
+3. **Linear Context Projector & Session Inspector ([`Session/Projection/`](Session/Projection/) & [`Session/Inspection/`](Session/Inspection/)):**
+   - **Context Projector (`ISessionProjector`)**: Traverses the linear trunk and emits only the outermost active representation of each node into the LLM context buffer.
+   - **Session Inspector (`ISessionInspector`)**: Recursively unwraps nested nodes to reconstruct full transformation histories and generates compression audit metrics.
+   - **Automatic Post-Squash Audit Report**: Emits a Solarpunk-styled audit report in Chlorophyll OS after every branch squash displaying raw turns, projected turns, compression ratio, shadowed observations, and collapsed exploratory groups.
 
-4. **Dynamic Roslyn Tool Engine ([`Tools/ToolManager.cs`](Tools/ToolManager.cs)):**
-   - Compiles tool implementations (`Tools/Implementations/*.cs`) at runtime using Roslyn.
-   - Includes metadata references for `System.Text.Json`, `Wayfare.Tools`, and `Wayfare.Infrastructure.Configuration`.
+4. **Context Engineering & Milestone Squashing ([`Agent/Prompts.cs`](Agent/Prompts.cs) & [`Agent/BranchSquasher.cs`](Agent/BranchSquasher.cs)):**
+   - **STARL + Key Artifacts Invariants**: Summarises completed active branches into STARL format (Situation, Task, Action, Result, Learnings) plus Key Artifacts (exact file paths, executed commands, and state guarantees) inside `<milestone_summary>` tags.
 
-5. **Architecture & Design Standards ([`ARCHITECTURE.md`](ARCHITECTURE.md) & [`PRINCIPLES.md`](PRINCIPLES.md)):**
-   - Detailed design guidelines covering early boundary guards, linear data flow, zero-noise helper methods, null safety, and tool implementation rules.
+5. **Dynamic Roslyn Tool Engine ([`Tools/ToolManager.cs`](Tools/ToolManager.cs)):**
+   - Compiles tool implementations (`Tools/Implementations/*.cs`) at runtime using Roslyn with seamed I/O boundaries.
 
 ---
 
@@ -56,13 +88,23 @@ Wayfare/
 │   ├── Clients/
 │   │   └── OpenAIClient.cs                    // DelegatingChatClient for OpenAI reasoning extraction
 │   └── Events/                                // Channel-based event broker & event records
-│       ├── Events.cs
+│       ├── Events.cs                          // CycleCompletedEvent with SessionAuditReport
 │       └── EventBroker.cs
-├── Session/                                   // In-memory AST, turns, and async disk persistence
-│   ├── ISession.cs
-│   ├── Session.cs
-│   ├── SessionModels.cs
-│   └── SessionStore.cs
+├── Session/                                   // Immutable Context Ledger, Projection & Persistence
+│   ├── ISession.cs                            // Session contract with LinearTrunk & Pipeline
+│   ├── Session.cs                             // In-memory ledger implementation
+│   ├── SessionModels.cs                       // HistoryNode polymorphic hierarchy & SessionMessages
+│   ├── SessionStore.cs                        // Channel-backed async disk persistence
+│   ├── Transformations/                       // Deterministic Transformation Pipeline
+│   │   ├── ITransformationPipeline.cs
+│   │   ├── TransformationPipeline.cs
+│   │   ├── ResourceIndex.cs                   // Resource access index
+│   │   ├── WriteShadowingRule.cs              // Superseded state elimination
+│   │   └── DiagnosticCollapseRule.cs          // Ephemeral action pruning
+│   ├── Projection/                            // Context projection for LLM inference
+│   │   └── SessionProjector.cs                // Linear trunk context projector
+│   └── Inspection/                            // Observability & transformation history traversal
+│       └── SessionInspector.cs                // Recursive lineage unwrapping & audit metrics
 ├── Tools/                                     // Dynamic Roslyn compiler & built-in tool plugins
 │   ├── ITool.cs
 │   ├── ToolManager.cs
@@ -70,25 +112,25 @@ Wayfare/
 │   └── Implementations/
 │       ├── ExecuteCommandTool.cs
 │       ├── FindTool.cs
-│       ├── InspectMilestoneTool.cs
+│       ├── InspectMilestoneTool.cs            // Inspects compressed milestone summaries & turns
 │       ├── ListTool.cs
 │       ├── ReadFileTool.cs
 │       ├── ReplaceTool.cs
 │       └── WriteFileTool.cs
 ├── Agent/                                     // 5-phase orchestration pipeline & prompt builders
 │   ├── AgentModels.cs
-│   ├── Orchestrator.cs
+│   ├── Orchestrator.cs                        // Core agent loop with post-squash audit report
 │   ├── PivotDetector.cs
 │   ├── BranchSquasher.cs
 │   ├── CircuitBreaker.cs                      // Loop detection & repetition breaker strategy
-│   └── Prompts.cs
+│   └── Prompts.cs                             // Prompt builder using ISessionProjector
 └── UI/                                        // Solarpunk terminal interface & Spectre renderers
     ├── ITerminalUI.cs
     ├── TerminalUI.cs
     ├── ColourPalette.cs
     └── Components/
         ├── MarkdownStreamRenderer.cs
-        ├── ProgressRenderer.cs
+        ├── ProgressRenderer.cs                // Harvested milestones & Solarpunk audit reporter
         └── ThinkingStreamRenderer.cs
 ```
 
@@ -99,12 +141,12 @@ Wayfare/
 | Tool | Name | Description | Output Format & Invariants |
 | :--- | :--- | :--- | :--- |
 | **Read File** | `read` | Read line range from file (`path`, `offset`, `limit`). Default limit is 200 lines. | Formatted with 1-indexed, right-aligned line numbers wrapped in `<observation tool="read_file" path="..." lines="..." total_lines="...">`. |
-| **Write File** | `write` | Create new file or overwrite file content (`path`, `content`). | Structured result confirming written byte/line counts. |
-| **Replace Content** | `replace` | Exact unique string replacement in file (`path`, `oldText`, `newText`, `startLine`, `endLine`). | Supports optional line search window bounds (`startLine`, `endLine`). Returns diagnostic errors wrapped in `<observation tool="replace" status="error">`. |
-| **List Directory** | `list` | List contents of directory (`path`). | Filtered against excluded noise directories. |
-| **Find Files** | `find` | Find files matching pattern (`path`, `pattern`). | Filtered by `Settings.ExcludedDirectories`, capped at 50 results with truncation note, wrapped in `<observation tool="find" ...>`. |
+| **Write File** | `write` | Create new file or overwrite file content (`path`, `content`). | Structured result confirming written byte/line counts. Triggers write shadowing on prior read/write observations. |
+| **Replace Content** | `replace` | Exact unique string replacement in file (`path`, `oldText`, `newText`, `startLine`, `endLine`). | Supports optional line search window bounds (`startLine`, `endLine`). Triggers write shadowing on prior read/write observations. |
+| **List Directory** | `list` | List contents of directory (`path`). | Filtered against excluded noise directories. Categorized as exploratory for diagnostic collapse. |
+| **Find Files** | `find` | Find files matching pattern (`path`, `pattern`). | Filtered by `Settings.ExcludedDirectories`, capped at 50 results. Categorized as exploratory for diagnostic collapse. |
 | **Execute Command** | `execute` | Run executable command in working directory (`command`, `arguments`). | Captured standard output and error streams. |
-| **Inspect Milestone** | `inspect_milestone` | Inspect details and turns of a past milestone (`id`). | Detailed turns and summary of target squashed milestone. |
+| **Inspect Milestone** | `inspect_milestone` | Inspect details and compressed turns of a past milestone (`id`). | Detailed compressed turns and summary of target squashed milestone. |
 
 ---
 
