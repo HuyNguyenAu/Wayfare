@@ -1,6 +1,8 @@
 namespace Wayfare.Agent;
 
 using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.AI;
 using Wayfare.Infrastructure.AI;
 using Wayfare.Infrastructure.Events;
 using Wayfare.Session;
@@ -93,43 +95,60 @@ public class Orchestrator(
         eventPublisher.Publish(new ChatRequestStartedEvent(toolNames));
 
         StringBuilder assembledContent = new();
-        Dictionary<int, ToolCallBuilder> toolCallBuilders = [];
-        AgentFinishReason? finishReason = null;
+        Dictionary<string, ToolCallBuilder> toolCallBuilders = [];
+        ChatFinishReason? finishReason = null;
+        string? activeCallKey = null;
 
-        IReadOnlyList<SessionMessage> messages = messagePromptBuilder.BuildMessages(toolManager.Tools, _session.History, _session.Intent);
-
-        await foreach (StreamingChatUpdate update in chatClient.StreamChatAsync(messages, toolManager.Tools, cancellationToken))
+        IReadOnlyList<SessionMessage> sessionMessages = messagePromptBuilder.BuildMessages(toolManager.Tools, _session.History, _session.Intent);
+        List<ChatMessage> chatMessages = SessionMessageMapper.ToChatMessages(sessionMessages);
+        ChatOptions chatOptions = new()
         {
-            if (update.ContentUpdate is not null)
+            Tools = toolManager.Tools.ToAITools()
+        };
+
+        await foreach (ChatResponseUpdate update in chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken))
+        {
+            foreach (AIContent content in update.Contents)
             {
-                assembledContent.Append(update.ContentUpdate);
-                eventPublisher.Publish(new TokenChunkReceivedEvent(update.ContentUpdate));
+                if (content is ReasoningContent reasoning)
+                {
+                    eventPublisher.Publish(new ThinkingChunkReceivedEvent(reasoning.Text));
+                }
+                else if (content is FunctionCallContent functionCall)
+                {
+                    string key = !string.IsNullOrEmpty(functionCall.CallId) ? functionCall.CallId : (activeCallKey ?? Guid.NewGuid().ToString());
+                    if (!toolCallBuilders.TryGetValue(key, out ToolCallBuilder? builder))
+                    {
+                        builder = new ToolCallBuilder();
+                        toolCallBuilders[key] = builder;
+                        activeCallKey = key;
+                    }
+
+                    if (!string.IsNullOrEmpty(functionCall.CallId))
+                    {
+                        builder.ToolId.Append(functionCall.CallId);
+                    }
+
+                    if (!string.IsNullOrEmpty(functionCall.Name))
+                    {
+                        builder.Name.Append(functionCall.Name);
+                    }
+
+                    if (functionCall.Arguments is not null)
+                    {
+                        builder.Args = JsonSerializer.Serialize(functionCall.Arguments);
+                    }
+                    else if (functionCall.RawRepresentation is OpenAI.Chat.StreamingChatToolCallUpdate rawChunk && !string.IsNullOrEmpty(rawChunk.FunctionArgumentsUpdate?.ToString()))
+                    {
+                        builder.RawArgs.Append(rawChunk.FunctionArgumentsUpdate.ToString());
+                    }
+                }
             }
 
-            if (update.ToolCallUpdate is not null)
+            if (!string.IsNullOrEmpty(update.Text))
             {
-                StreamingToolCallChunk toolCallUpdate = update.ToolCallUpdate;
-
-                if (!toolCallBuilders.TryGetValue(toolCallUpdate.Index, out ToolCallBuilder? builder))
-                {
-                    builder = new ToolCallBuilder();
-                    toolCallBuilders[toolCallUpdate.Index] = builder;
-                }
-
-                if (!string.IsNullOrEmpty(toolCallUpdate.ToolId))
-                {
-                    builder.ToolId.Append(toolCallUpdate.ToolId);
-                }
-
-                if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
-                {
-                    builder.Name.Append(toolCallUpdate.FunctionName);
-                }
-
-                if (!string.IsNullOrEmpty(toolCallUpdate.FunctionArgumentsUpdate))
-                {
-                    builder.Args.Append(toolCallUpdate.FunctionArgumentsUpdate);
-                }
+                assembledContent.Append(update.Text);
+                eventPublisher.Publish(new TokenChunkReceivedEvent(update.Text));
             }
 
             if (update.FinishReason is not null)
@@ -144,7 +163,11 @@ public class Orchestrator(
         _session.AppendTurn(assistantMessage);
         await sessionStore.SaveAsync(cancellationToken);
 
-        IReadOnlyList<ToolCall> toolCalls = [.. toolCallBuilders.Values.Select(builder => new ToolCall(builder.ToolId.ToString(), builder.Name.ToString(), builder.Args.ToString()))];
+        IReadOnlyList<ToolCall> toolCalls = [.. toolCallBuilders.Values.Select(builder => new ToolCall(
+            builder.ToolId.ToString(),
+            builder.Name.ToString(),
+            !string.IsNullOrEmpty(builder.Args) ? builder.Args : builder.RawArgs.ToString()
+        ))];
 
         return new ThinkingPhaseResult(toolCalls, finishReason);
     }
@@ -275,17 +298,18 @@ public class Orchestrator(
 
     private sealed record ThinkingPhaseResult(
         IReadOnlyList<ToolCall> ToolCalls,
-        AgentFinishReason? FinishReason)
+        ChatFinishReason? FinishReason)
     {
         public bool HasToolCalls => ToolCalls.Count > 0;
-        public bool IsCompleted => FinishReason is AgentFinishReason.Stop or AgentFinishReason.Length;
+        public bool IsCompleted => FinishReason == ChatFinishReason.Stop || FinishReason == ChatFinishReason.Length;
     }
 
     private sealed class ToolCallBuilder
     {
         public StringBuilder ToolId { get; } = new();
         public StringBuilder Name { get; } = new();
-        public StringBuilder Args { get; } = new();
+        public string? Args { get; set; }
+        public StringBuilder RawArgs { get; } = new();
     }
 
     #endregion

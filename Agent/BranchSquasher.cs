@@ -1,6 +1,7 @@
 namespace Wayfare.Agent;
 
 using System.Text;
+using Microsoft.Extensions.AI;
 using Wayfare.Infrastructure.AI;
 using Wayfare.Session;
 using Wayfare.Tools;
@@ -18,14 +19,15 @@ public class BranchSquasher(IChatClient chatClient) : IBranchSquasher
             throw new InvalidOperationException($"Cannot squash active branch because session history does not end with a {nameof(BranchNode)}.");
         }
 
-        IReadOnlyList<SessionMessage> messages = [
-            new SystemMessage(SquashPromptBuilder.Build()),
-            new UserMessage(BuildTraceString(activeBranch))
+        List<ChatMessage> messages = [
+            new ChatMessage(ChatRole.System, SquashPromptBuilder.Build()),
+            new ChatMessage(ChatRole.User, BuildTraceString(activeBranch))
         ];
+        ChatResponse response = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
 
-        ChatCompletionResult summary = await chatClient.CompleteChatAsync(messages, [], cancellationToken);
-        return summary.Content.Trim();
+        return (response.Text ?? string.Empty).Trim();
     }
+
 
     #endregion
 

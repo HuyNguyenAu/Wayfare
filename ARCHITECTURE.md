@@ -10,7 +10,7 @@ Wayfare is designed around five foundational qualities:
 
 1. **High Navigability & Feature Slicing**: A developer inspecting the codebase for the first time should understand the overall application lifecycle in under 30 seconds. Components are organised into clear domain slices (`Session/`, `Agent/`, `Tools/`, `Infrastructure/`, `UI/`).
 2. **Composition Over Inheritance**: Data structures use flat polymorphic records (algebraic discriminated unions), and services compose focused collaborator strategies without deep class inheritance trees.
-3. **100% Unit Testability**: Clean abstraction seams at I/O and external boundaries (`IChatClient`, `ISessionStore`, `IEventPublisher`, `IToolManager`, `IToolHelpers`) allow complete testing without real network, file system, or process invocations.
+3. **100% Unit Testability**: Clean abstraction seams at I/O and external boundaries (`Microsoft.Extensions.AI.IChatClient`, `ISessionStore`, `IEventPublisher`, `IToolManager`, `IToolHelpers`) allow complete testing without real network, file system, or process invocations.
 4. **Early Boundary Guards**: Public entry points validate inputs and state upfront, guaranteeing that internal methods execute in a valid state.
 5. **Zero-Noise Internal Helpers**: Private helper methods perform direct, focused tasks without repetitive defensive assertions or redundant null checks.
 
@@ -34,7 +34,7 @@ graph TD
 ### Phase Breakdown
 
 1. **Initialise Phase**: Receives raw user input, starts a new conversation branch in `Session`, and transitions state to `Thinking`.
-2. **Thinking Phase**: Constructs `SessionMessage` prompts from session history, streams tokens from the LLM (`IChatClient`), and assembles content or `ToolCall` requests.
+2. **Thinking Phase**: Constructs `SessionMessage` prompts from session history, maps them to `Microsoft.Extensions.AI.ChatMessage`, streams tokens and reasoning tokens from the LLM (`IChatClient`), and assembles content or `ToolCall` requests.
 3. **Acting Phase**: Dispatches tool invocations in parallel to `ITool` instances registered in `ToolManager`.
 4. **Observing Phase**: Records tool execution results (`ToolExecutionResult`) back into the `Session` AST and loops back to `Thinking`.
 5. **Finalise Phase**: Squashes completed branch turns into a concise STARL milestone (`BranchSquasher`) and emits a `CycleCompletedEvent`.
@@ -48,10 +48,13 @@ Wayfare/
 ├── Program.cs                                 // Composition root & top-level REPL loop
 ├── Infrastructure/
 │   ├── Configuration/Settings.cs              // Environment configuration & validation
-│   ├── AI/                                    // Chat streaming & completion contracts/models
-│   │   ├── IChatClient.cs
-│   │   └── ChatModels.cs
-│   ├── Clients/OpenAIClient.cs                // OpenAI SDK adapter
+│   ├── AI/                                    // MEAI streaming contracts, mappers & reasoning content
+│   │   ├── ChatModels.cs                      // ToolCall DTO
+│   │   ├── ReasoningContent.cs                // AIContent representation for reasoning tokens
+│   │   ├── SessionMessageMapper.cs            // SessionMessage to ChatMessage converter
+│   │   └── ToolMapper.cs                      // ITool to AIFunction / AITool mapper
+│   ├── Clients/                               // Chat client decorators & adapters
+│   │   └── ReasoningExtractionChatClient.cs   // DelegatingChatClient for OpenAI reasoning extraction
 │   └── Events/                                // Channel-based event broker & event records
 │       ├── Events.cs
 │       └── EventBroker.cs
@@ -86,7 +89,8 @@ Wayfare/
     ├── ColourPalette.cs
     └── Components/
         ├── MarkdownStreamRenderer.cs
-        └── ProgressRenderer.cs
+        ├── ProgressRenderer.cs
+        └── ThinkingStreamRenderer.cs
 ```
 
 ---

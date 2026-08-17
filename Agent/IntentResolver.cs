@@ -1,6 +1,6 @@
 namespace Wayfare.Agent;
 
-using Wayfare.Infrastructure.AI;
+using Microsoft.Extensions.AI;
 using Wayfare.Session;
 
 public class IntentResolver(IChatClient chatClient) : IIntentResolver
@@ -10,13 +10,13 @@ public class IntentResolver(IChatClient chatClient) : IIntentResolver
         ArgumentNullException.ThrowIfNull(currentIntent);
         ArgumentException.ThrowIfNullOrWhiteSpace(userInput);
 
-        IReadOnlyList<SessionMessage> messages = [
-            new SystemMessage(IntentPromptBuilder.BuildSystem()),
-            new UserMessage(IntentPromptBuilder.BuildUser(currentIntent, userInput))
+        List<ChatMessage> messages = [
+            new ChatMessage(ChatRole.System, IntentPromptBuilder.BuildSystem()),
+            new ChatMessage(ChatRole.User, IntentPromptBuilder.BuildUser(currentIntent, userInput))
         ];
 
-        ChatCompletionResult response = await chatClient.CompleteChatAsync(messages, [], cancellationToken);
-        string resolvedIntent = response.Content.Trim();
+        ChatResponse response = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+        string resolvedIntent = (response.Text ?? string.Empty).Trim();
 
         return !string.IsNullOrWhiteSpace(resolvedIntent) ? resolvedIntent : userInput.Trim();
     }

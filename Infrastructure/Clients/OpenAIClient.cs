@@ -1,117 +1,156 @@
 namespace Wayfare.Infrastructure.Clients;
 
+using System.ClientModel.Primitives;
 using System.Runtime.CompilerServices;
-using OpenAI.Chat;
+using System.Text.Json;
+using Microsoft.Extensions.AI;
 using Wayfare.Infrastructure.AI;
-using Wayfare.Session;
-using Wayfare.Tools;
 
-public class OpenAIClient(ChatClient client) : IChatClient
+#region Delegating Chat Client Implementation
+
+public class OpenAIClient : DelegatingChatClient
 {
-    public async IAsyncEnumerable<StreamingChatUpdate> StreamChatAsync(
-        IReadOnlyList<SessionMessage> sessionMessages,
-        IReadOnlyList<ITool> tools,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public OpenAIClient(IChatClient innerClient) : base(innerClient)
     {
-        ChatCompletionOptions options = CreateChatCompletionOptions(tools);
-        List<ChatMessage> messages = MapSessionMessagesToChatMessages(sessionMessages);
+        ArgumentNullException.ThrowIfNull(innerClient);
+    }
 
-        await foreach (StreamingChatCompletionUpdate update in client.CompleteChatStreamingAsync(messages, options, cancellationToken))
+    public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (ChatResponseUpdate update in base.GetStreamingResponseAsync(chatMessages, options, cancellationToken))
         {
-            foreach (ChatMessageContentPart part in update.ContentUpdate)
+            string? reasoning = ExtractReasoningFromUpdate(update);
+
+            if (!string.IsNullOrEmpty(reasoning))
             {
-                if (!string.IsNullOrEmpty(part.Text))
-                {
-                    yield return new StreamingChatUpdate(ContentUpdate: part.Text);
-                }
+                update.Contents.Add(new ReasoningContent(reasoning));
             }
 
-            foreach (StreamingChatToolCallUpdate toolCallUpdate in update.ToolCallUpdates)
-            {
-                yield return new StreamingChatUpdate(
-                    ToolCallUpdate: new StreamingToolCallChunk(
-                        toolCallUpdate.Index,
-                        toolCallUpdate.ToolCallId ?? string.Empty,
-                        toolCallUpdate.FunctionName ?? string.Empty,
-                        toolCallUpdate.FunctionArgumentsUpdate?.ToString() ?? string.Empty
-                    )
-                );
-            }
-
-            if (update.FinishReason is not null)
-            {
-                yield return new StreamingChatUpdate(FinishReason: MapFinishReason(update.FinishReason.Value));
-            }
+            yield return update;
         }
     }
 
-    public async Task<ChatCompletionResult> CompleteChatAsync(
-        IReadOnlyList<SessionMessage> sessionMessages,
-        IReadOnlyList<ITool> tools,
-        CancellationToken cancellationToken)
+    public override async Task<ChatResponse> GetResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
-        ChatCompletionOptions options = CreateChatCompletionOptions(tools);
-        List<ChatMessage> messages = MapSessionMessagesToChatMessages(sessionMessages);
+        ChatResponse response = await base.GetResponseAsync(chatMessages, options, cancellationToken);
+        string? reasoning = ExtractReasoningFromResponse(response);
 
-        ChatCompletion chatCompletion = await client.CompleteChatAsync(messages, options, cancellationToken);
-        string content = chatCompletion.Content.Count > 0 ? chatCompletion.Content[0].Text ?? string.Empty : string.Empty;
-
-        return new ChatCompletionResult(
-            Content: content,
-            FinishReason: MapFinishReason(chatCompletion.FinishReason)
-        );
-    }
-
-    private static ChatCompletionOptions CreateChatCompletionOptions(IReadOnlyList<ITool> tools)
-    {
-        ChatCompletionOptions options = new()
+        if (!string.IsNullOrEmpty(reasoning) && response.Messages.Count > 0)
         {
-            AllowParallelToolCalls = false,
-        };
-
-        foreach (ITool tool in tools)
-        {
-            options.Tools.Add(ChatTool.CreateFunctionTool(tool.Name, tool.Description, tool.Parameters.ToBinaryData(), functionSchemaIsStrict: true));
+            response.Messages[^1].Contents.Add(new ReasoningContent(reasoning));
         }
 
-        return options;
+        return response;
     }
 
-    internal static List<ChatMessage> MapSessionMessagesToChatMessages(IReadOnlyList<SessionMessage> sessionMessages)
-    {
-        List<ChatMessage> chatMessages = [];
+    #region Internal Reasoning Extraction Helpers
 
-        foreach (SessionMessage sessionMessage in sessionMessages)
+    internal static string? ExtractReasoningFromUpdate(ChatResponseUpdate update)
+    {
+        if (update.RawRepresentation is OpenAI.Chat.StreamingChatCompletionUpdate openAIUpdate)
         {
-            List<ChatMessage> mappedMessages = sessionMessage switch
+            return ExtractReasoningContent(openAIUpdate);
+        }
+
+        return null;
+    }
+
+    internal static string? ExtractReasoningFromResponse(ChatResponse response)
+    {
+        if (response.RawRepresentation is OpenAI.Chat.ChatCompletion openAICompletion)
+        {
+            return ExtractReasoningContent(openAICompletion);
+        }
+
+        return null;
+    }
+
+    internal static string? ExtractReasoningContent(OpenAI.Chat.StreamingChatCompletionUpdate update)
+    {
+        BinaryData data = ModelReaderWriter.Write(update);
+        using JsonDocument document = JsonDocument.Parse(data);
+
+        if (!document.RootElement.TryGetProperty("choices", out JsonElement choices) || choices.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        JsonElement firstChoice = choices[0];
+
+        if (firstChoice.TryGetProperty("delta", out JsonElement delta))
+        {
+            if (delta.TryGetProperty("reasoning_content", out JsonElement reasoningContent) && reasoningContent.ValueKind == JsonValueKind.String)
             {
-                SystemMessage message => [new SystemChatMessage(message.Content)],
-                UserMessage message => [new UserChatMessage(message.Content)],
-                AssistantMessage message => [new AssistantChatMessage(message.Content)],
-                ToolCallMessage message => [new AssistantChatMessage(message.ToolCalls.Select(toolCall => ChatToolCall.CreateFunctionToolCall(toolCall.ToolId, toolCall.Name, BinaryData.FromString(toolCall.Arguments))))],
-                ToolResultMessage message => [.. message.Results.Select(toolResult => new ToolChatMessage(
-                    toolResult.ToolId,
-                    toolResult.Success
-                        ? (string.IsNullOrWhiteSpace(toolResult.Result) ? $"Tool '{toolResult.ToolName}' completed successfully with no output." : toolResult.Result)
-                        : (string.IsNullOrWhiteSpace(toolResult.Error) ? $"ERROR: Tool '{toolResult.ToolName}' failed without an explicit error message. Verify tool parameters and check file paths with 'list' or 'find' before retrying." : $"ERROR: {toolResult.Error}")))],
-                _ => throw new InvalidOperationException($"Unknown message type: {sessionMessage.GetType().Name}")
-            };
+                return reasoningContent.GetString();
+            }
 
-            chatMessages.AddRange(mappedMessages);
+            if (delta.TryGetProperty("reasoning", out JsonElement reasoning) && reasoning.ValueKind == JsonValueKind.String)
+            {
+                return reasoning.GetString();
+            }
+
+            if (delta.TryGetProperty("thought", out JsonElement thought) && thought.ValueKind == JsonValueKind.String)
+            {
+                return thought.GetString();
+            }
         }
 
-        return chatMessages;
+        return null;
     }
 
-    private static AgentFinishReason MapFinishReason(OpenAI.Chat.ChatFinishReason finishReason)
+    internal static string? ExtractReasoningContent(OpenAI.Chat.ChatCompletion chatCompletion)
     {
-        return finishReason switch
+        BinaryData data = ModelReaderWriter.Write(chatCompletion);
+        using JsonDocument document = JsonDocument.Parse(data);
+
+        if (!document.RootElement.TryGetProperty("choices", out JsonElement choices) || choices.GetArrayLength() == 0)
         {
-            ChatFinishReason.Stop => AgentFinishReason.Stop,
-            ChatFinishReason.Length => AgentFinishReason.Length,
-            ChatFinishReason.ContentFilter => AgentFinishReason.ContentFilter,
-            ChatFinishReason.ToolCalls => AgentFinishReason.ToolCalls,
-            _ => throw new InvalidOperationException($"Unexpected finish reason: {finishReason}")
-        };
+            return null;
+        }
+
+        JsonElement firstChoice = choices[0];
+
+        if (firstChoice.TryGetProperty("message", out JsonElement message))
+        {
+            if (message.TryGetProperty("reasoning_content", out JsonElement reasoningContent) && reasoningContent.ValueKind == JsonValueKind.String)
+            {
+                return reasoningContent.GetString();
+            }
+
+            if (message.TryGetProperty("reasoning", out JsonElement reasoning) && reasoning.ValueKind == JsonValueKind.String)
+            {
+                return reasoning.GetString();
+            }
+
+            if (message.TryGetProperty("thought", out JsonElement thought) && thought.ValueKind == JsonValueKind.String)
+            {
+                return thought.GetString();
+            }
+        }
+
+        return null;
+    }
+
+    #endregion
+}
+
+#endregion
+
+#region Builder Extensions
+
+public static class ReasoningChatClientExtensions
+{
+    public static ChatClientBuilder UseReasoningExtraction(this ChatClientBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.Use(innerClient => new OpenAIClient(innerClient));
     }
 }
+
+#endregion

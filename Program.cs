@@ -1,6 +1,7 @@
 namespace Wayfare;
 
 using System.ClientModel;
+using Microsoft.Extensions.AI;
 using Wayfare.Agent;
 using Wayfare.Infrastructure.Clients;
 using Wayfare.Infrastructure.Configuration;
@@ -10,18 +11,22 @@ using Wayfare.Tools;
 using Wayfare.Tools.Implementations;
 using Wayfare.UI;
 
+
 public class Program
 {
     public static async Task Main()
     {
         Settings settings = Settings.FromEnvironment();
 
-        OpenAI.Chat.ChatClient chatClient = new(
+        OpenAI.Chat.ChatClient openAIChatClient = new(
             settings.ModelName,
             new ApiKeyCredential(settings.ApiKey),
             new OpenAI.OpenAIClientOptions { Endpoint = new Uri(settings.Endpoint) }
         );
-        OpenAIClient openAIClient = new(chatClient);
+        IChatClient chatClient = openAIChatClient.AsIChatClient()
+            .AsBuilder()
+            .UseReasoningExtraction()
+            .Build();
 
         CancellationTokenSource cancellationTokenSource = new();
         Console.CancelKeyPress += (sender, eventArgs) =>
@@ -54,12 +59,12 @@ public class Program
         eventBroker.Publish(new StartupCompletedEvent());
         eventBroker.Publish(new AgentStartedEvent());
 
-        BranchSquasher branchSquasher = new(openAIClient);
+        BranchSquasher branchSquasher = new(chatClient);
         MessagePromptBuilder messagePromptBuilder = new();
-        IntentResolver intentResolver = new(openAIClient);
+        IntentResolver intentResolver = new(chatClient);
         PivotDetector pivotDetector = new();
         CircuitBreaker circuitBreaker = new(settings.MaxTurns);
-        Orchestrator orchestrator = new(openAIClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, intentResolver, pivotDetector, circuitBreaker);
+        Orchestrator orchestrator = new(chatClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, intentResolver, pivotDetector, circuitBreaker);
 
         try
         {

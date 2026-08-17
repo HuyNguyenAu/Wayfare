@@ -59,9 +59,12 @@ public record ChatRequestStartedEvent(IReadOnlyList<string> ToolNames) : IEvent;
 
 public record ChatRequestCompletedEvent : IEvent;
 
+public record ThinkingChunkReceivedEvent(string Content) : IEvent;
+
 public record TokenChunkReceivedEvent(string Content) : IEvent;
 
 #endregion
+
 
 #region Session & Cycle Events
 

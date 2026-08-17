@@ -1,9 +1,9 @@
+namespace Wayfare.UI.Components;
+
 using System.IO.Pipelines;
 using System.Text;
 using NTokenizers.Extensions.Spectre.Console;
 using Spectre.Console;
-
-namespace Wayfare.UI.Components;
 
 public class MarkdownStreamRenderer
 {
@@ -12,10 +12,12 @@ public class MarkdownStreamRenderer
     private bool _isFirstChunk = true;
 
     public bool IsFirstChunk => _isFirstChunk;
+    public bool HeaderCompleted { get; set; }
 
     public void StartStream(CancellationToken cancellationToken)
     {
         _isFirstChunk = true;
+        HeaderCompleted = false;
         _markdownPipe = new Pipe();
         _markdownTask = Task.Run(() => AnsiConsole.Console.WriteMarkdownAsync(
             _markdownPipe.Reader.AsStream(),
@@ -29,7 +31,12 @@ public class MarkdownStreamRenderer
     {
         if (_isFirstChunk)
         {
-            AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ ]")}[/]");
+            if (!HeaderCompleted)
+            {
+                AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ ]")}[/]");
+                HeaderCompleted = true;
+            }
+
             _isFirstChunk = false;
         }
 
@@ -45,7 +52,12 @@ public class MarkdownStreamRenderer
     {
         if (_isFirstChunk)
         {
-            AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ ]")}[/]");
+            if (!HeaderCompleted)
+            {
+                AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ ]")}[/]");
+                HeaderCompleted = true;
+            }
+
             _isFirstChunk = false;
         }
 

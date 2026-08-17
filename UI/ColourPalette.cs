@@ -1,7 +1,7 @@
-using Spectre.Console;
-using NTokenizers.Extensions.Spectre.Console.Styles;
-
 namespace Wayfare.UI;
+
+using NTokenizers.Extensions.Spectre.Console.Styles;
+using Spectre.Console;
 
 public static class ColourPalette
 {

@@ -7,7 +7,7 @@ using Wayfare.Infrastructure.AI;
 using Wayfare.Session;
 using Wayfare.Tools;
 
-public sealed class InspectMilestoneTool(ISession session) : ITool
+internal sealed class InspectMilestoneTool(ISession session) : ITool
 {
     public string Name => "inspect_milestone";
     public string DisplayName => "Inspect Milestone";

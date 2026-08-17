@@ -14,6 +14,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
 
     private readonly IEventBroker _eventBroker;
     private readonly Task _eventLoopTask;
+    private readonly ThinkingStreamRenderer _thinkingStreamRenderer;
     private readonly MarkdownStreamRenderer _markdownStreamRenderer;
     private readonly TaskCompletionSource _agentReadyTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -22,12 +23,14 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(eventBroker);
 
         _eventBroker = eventBroker;
+        _thinkingStreamRenderer = new ThinkingStreamRenderer();
         _markdownStreamRenderer = new MarkdownStreamRenderer();
         Console.OutputEncoding = Encoding.UTF8;
         AnsiConsole.Clear();
 
         _eventLoopTask = Task.Run(() => ProcessEventsAsync(cancellationToken), cancellationToken);
     }
+
 
     public async Task<string> GetUserInputAsync(CancellationToken cancellationToken)
     {
@@ -84,6 +87,7 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
         finally
         {
             _agentReadyTaskCompletionSource.TrySetResult();
+            await _thinkingStreamRenderer.CompleteStreamAsync();
             await _markdownStreamRenderer.CompleteStreamAsync();
         }
     }
@@ -135,12 +139,19 @@ public class TerminalUI : ITerminalUI, IAsyncDisposable
                 break;
             case ChatRequestStartedEvent chatRequestStartedEvent:
                 ProgressRenderer.RenderChatRequestStarted(chatRequestStartedEvent.ToolNames);
+                _thinkingStreamRenderer.StartStream();
                 _markdownStreamRenderer.StartStream(cancellationToken);
                 break;
             case ChatRequestCompletedEvent:
+                await _thinkingStreamRenderer.CompleteStreamAsync();
                 await _markdownStreamRenderer.CompleteStreamAsync();
                 break;
+            case ThinkingChunkReceivedEvent thinkingChunkReceivedEvent:
+                await _thinkingStreamRenderer.AppendChunkAsync(thinkingChunkReceivedEvent.Content, cancellationToken);
+                _markdownStreamRenderer.HeaderCompleted = true;
+                break;
             case TokenChunkReceivedEvent tokenChunkReceivedEvent:
+                await _thinkingStreamRenderer.CompleteStreamAsync();
                 await _markdownStreamRenderer.AppendChunkAsync(tokenChunkReceivedEvent.Content, cancellationToken);
                 break;
             case ToolExecutionStartedEvent toolExecutionStartedEvent:

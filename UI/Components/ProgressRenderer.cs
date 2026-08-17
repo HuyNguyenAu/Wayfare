@@ -1,6 +1,6 @@
-using Spectre.Console;
-
 namespace Wayfare.UI.Components;
+
+using Spectre.Console;
 
 public static class ProgressRenderer
 {
