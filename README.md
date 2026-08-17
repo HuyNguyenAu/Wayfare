@@ -24,6 +24,7 @@ graph TD
    - [`HistoryNode`](Session/SessionModels.cs): Abstract base record with polymorphic JSON serialisation attributes (`[JsonPolymorphic]`, `[JsonDerivedType]`).
    - [`BranchNode`](Session/SessionModels.cs): Active working branch representing live tool execution turns and squashed milestone summaries.
    - [`TurnNode`](Session/SessionModels.cs): Leaf node wrapping discrete domain messages (`UserMessage`, `AssistantMessage`, `ToolCallMessage`, `ToolResultMessage`).
+   - [`SessionProgress`](Session/SessionModels.cs): Lightweight summary record carrying harvested milestone summaries across cycles.
 
 2. **Context Engineering ([`Agent/Prompts.cs`](Agent/Prompts.cs)):**
    - **Positive XML Framing**: Replaces fragile negative prompt constraints with structured XML boundary markers (`<milestone_summary>`, `<observation>`).
@@ -52,7 +53,7 @@ Wayfare/
 │   │   ├── ReasoningContent.cs                // AIContent representation for reasoning tokens
 │   │   ├── SessionMessageMapper.cs            // SessionMessage to ChatMessage converter
 │   │   └── ToolMapper.cs                      // ITool to AIFunction / AITool mapper
-│   ├── Clients/                               // Chat client decorators & adapters
+│   ├── Clients/
 │   │   └── OpenAIClient.cs                    // DelegatingChatClient for OpenAI reasoning extraction
 │   └── Events/                                // Channel-based event broker & event records
 │       ├── Events.cs
@@ -67,9 +68,9 @@ Wayfare/
 │   ├── ToolManager.cs
 │   ├── ToolHelpers.cs
 │   └── Implementations/
-│       ├── InspectMilestoneTool.cs
 │       ├── ExecuteCommandTool.cs
 │       ├── FindTool.cs
+│       ├── InspectMilestoneTool.cs
 │       ├── ListTool.cs
 │       ├── ReadFileTool.cs
 │       ├── ReplaceTool.cs
