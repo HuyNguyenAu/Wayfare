@@ -13,6 +13,11 @@ public sealed class InspectMilestoneTool(ISession session) : ITool
     public string DisplayName => "Inspect Milestone";
     public string Description => "Inspect details of a past milestone including all turns. Parameters: id (string, required).";
 
+    public ToolSchema Parameters => ToolSchema.Object(new Dictionary<string, ToolPropertySchema>
+    {
+        ["id"] = ToolPropertySchema.String("The milestone ID or milestone ID prefix to inspect.")
+    });
+
     public string GetInvocationMessage(string arguments)
     {
         return TryParseId(arguments, out string? id)
@@ -22,13 +27,16 @@ public sealed class InspectMilestoneTool(ISession session) : ITool
 
     public Task<ToolExecutionResult> ExecuteAsync(string arguments, CancellationToken cancellationToken)
     {
+        string availableIds = session.History.Count > 0 ?
+            string.Join(", ", session.History.Select(branch => branch.Id)) : "None";
+
         if (string.IsNullOrWhiteSpace(arguments) || !TryParseId(arguments, out string? targetId) || string.IsNullOrWhiteSpace(targetId))
         {
             return Task.FromResult(new ToolExecutionResult(
                 Success: false,
                 DisplayMessage: "Failed to inspect milestone: 'id' parameter is required.",
                 Result: string.Empty,
-                Error: "Failed to inspect milestone: 'id' parameter is required. Usage: {\"id\": \"<milestone_id>\"}"));
+                Error: $"Failed to inspect milestone: 'id' parameter is required. Available milestone IDs in session: [{availableIds}]. Usage: {{\"id\": \"<milestone_id>\"}}"));
         }
 
         BranchNode? matchedBranch = null;
@@ -46,14 +54,11 @@ public sealed class InspectMilestoneTool(ISession session) : ITool
 
         if (matchedBranch is null)
         {
-            string availableIds = session.History.Count > 0 ?
-                string.Join(", ", session.History.Select(branch => branch.Id)) : "None";
-
             return Task.FromResult(new ToolExecutionResult(
                 Success: false,
                 DisplayMessage: $"Milestone '{targetId}' not found.",
                 Result: string.Empty,
-                Error: $"No milestone found matching ID '{targetId}'. Available milestone IDs: [{availableIds}]"));
+                Error: $"No milestone found matching ID '{targetId}'. Available milestone IDs in session: [{availableIds}]. Call inspect_milestone with a valid ID from this list."));
         }
 
         StringBuilder output = new();
@@ -118,7 +123,7 @@ public sealed class InspectMilestoneTool(ISession session) : ITool
         try
         {
             InspectMilestoneArguments? args = JsonSerializer.Deserialize<InspectMilestoneArguments>(arguments, ToolHelpers.JsonOptions);
-            id = args?.EffectiveId;
+            id = args?.Id;
             return !string.IsNullOrWhiteSpace(id);
         }
         catch
@@ -128,11 +133,5 @@ public sealed class InspectMilestoneTool(ISession session) : ITool
         }
     }
 
-    private sealed record InspectMilestoneArguments(
-        [property: JsonPropertyName("id")] string Id = "",
-        [property: JsonPropertyName("branchId")] string BranchId = "",
-        [property: JsonPropertyName("milestoneId")] string MilestoneId = "")
-    {
-        public string EffectiveId => !string.IsNullOrWhiteSpace(Id) ? Id : (!string.IsNullOrWhiteSpace(BranchId) ? BranchId : MilestoneId);
-    }
+    private sealed record InspectMilestoneArguments([property: JsonPropertyName("id")] string Id = "");
 }

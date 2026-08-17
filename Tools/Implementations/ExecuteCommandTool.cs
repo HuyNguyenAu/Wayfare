@@ -9,6 +9,12 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
     public string DisplayName => "Execute Command";
     public string Description => "Execute a CLI command. Parameters: command (string, required - the executable or command to run), arguments (string, optional - the arguments for the command)";
 
+    public ToolSchema Parameters => ToolSchema.Object(new Dictionary<string, ToolPropertySchema>
+    {
+        ["command"] = ToolPropertySchema.String("The executable or command to run."),
+        ["arguments"] = ToolPropertySchema.String("The arguments for the command.")
+    });
+
     public string GetInvocationMessage(string arguments)
     {
         return toolHelpers.TryDeserializeArguments(arguments, out ExecuteCommandArguments? args, out _)
@@ -20,12 +26,12 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
     {
         if (!toolHelpers.TryDeserializeArguments(arguments, out ExecuteCommandArguments? executeCommandArguments, out string? executeCommandArgumentsError))
         {
-            return new ToolExecutionResult(false, "Failed to execute command due to invalid tool arguments.", string.Empty, $"Failed to execute command: invalid tool arguments. Error: {executeCommandArgumentsError}");
+            return new ToolExecutionResult(false, "Failed to execute command due to invalid tool arguments.", string.Empty, $"Failed to execute command: invalid tool arguments. Error: {executeCommandArgumentsError}. Usage: {{\"command\": \"<executable>\", \"arguments\": \"<optional args>\"}}");
         }
 
         if (string.IsNullOrWhiteSpace(executeCommandArguments.Command))
         {
-            return new ToolExecutionResult(false, "Failed to execute command because 'command' parameter is missing.", string.Empty, "Failed to execute command: 'command' parameter is required.");
+            return new ToolExecutionResult(false, "Failed to execute command because 'command' parameter is missing.", string.Empty, "Failed to execute command: 'command' parameter is required. Specify the executable or command to run, e.g. {\"command\": \"dotnet\", \"arguments\": \"test\"}.");
         }
 
         try
@@ -44,15 +50,36 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
 
             if (process is null)
             {
-                return new ToolExecutionResult(false, $"Failed to start command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: process could not be started for '{executeCommandArguments.Command}'.");
+                return new ToolExecutionResult(false, $"Failed to start command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: process could not be started for '{executeCommandArguments.Command}'. Verify that the executable exists and is available on PATH.");
             }
 
-            Task<string> outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            Task<string> errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            linkedCts.CancelAfter(TimeSpan.FromSeconds(45));
+
+            Task<string> outputTask = process.StandardOutput.ReadToEndAsync(linkedCts.Token);
+            Task<string> errorTask = process.StandardError.ReadToEndAsync(linkedCts.Token);
 
             try
             {
-                await process.WaitForExitAsync(cancellationToken);
+                await process.WaitForExitAsync(linkedCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && linkedCts.IsCancellationRequested)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // Best-effort cleanup.
+                }
+
+                string cmdDesc = $"{executeCommandArguments.Command} {executeCommandArguments.Arguments}".Trim();
+                return new ToolExecutionResult(
+                    false,
+                    $"Command '{executeCommandArguments.Command}' timed out after 45 seconds.",
+                    string.Empty,
+                    $"Failed to execute command: command '{cmdDesc}' timed out after 45 seconds and was terminated. Consider running a more specific subcommand, reducing workload, or breaking the task down.");
             }
             catch (OperationCanceledException)
             {
@@ -70,10 +97,13 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
             string output = await outputTask;
             string error = await errorTask;
 
+            string truncatedOutput = TruncateOutput(output);
+            string truncatedError = TruncateOutput(error);
+
             bool success = process.ExitCode == 0;
             string displayMessage = success ? $"Command '{executeCommandArguments.Command}' executed successfully." : $"Command '{executeCommandArguments.Command}' exited with error code {process.ExitCode}.";
-            string result = success ? $"Command '{executeCommandArguments.Command}' executed successfully with exit code 0.{Environment.NewLine}Output:{Environment.NewLine}{output}" : string.Empty;
-            string errorMessage = success ? string.Empty : $"Command failed with exit code {process.ExitCode}. {(string.IsNullOrWhiteSpace(error) ? "No error output returned." : $"Stderr: {error}")}";
+            string result = success ? $"Command '{executeCommandArguments.Command}' executed successfully with exit code 0.{Environment.NewLine}Output:{Environment.NewLine}{truncatedOutput}" : string.Empty;
+            string errorMessage = success ? string.Empty : $"Command failed with exit code {process.ExitCode}. {(string.IsNullOrWhiteSpace(truncatedError) ? (string.IsNullOrWhiteSpace(truncatedOutput) ? "No output was written to stdout or stderr." : $"Stdout: {truncatedOutput}") : $"Stderr: {truncatedError}")}";
 
             return new ToolExecutionResult(success, displayMessage, result, errorMessage);
         }
@@ -81,6 +111,21 @@ internal sealed class ExecuteCommandTool(IToolHelpers toolHelpers) : ITool
         {
             return new ToolExecutionResult(false, $"An unexpected error occurred while executing command '{executeCommandArguments.Command}'.", string.Empty, $"Failed to execute command: an unexpected error occurred. Error: {ex.Message}", ex);
         }
+    }
+
+    internal static string TruncateOutput(string output, int maxChars = 6000)
+    {
+        if (string.IsNullOrEmpty(output) || output.Length <= maxChars)
+        {
+            return output;
+        }
+
+        int half = maxChars / 2;
+        int headLength = half;
+        int tailLength = half;
+        int truncatedCount = output.Length - maxChars;
+
+        return $"{output[..headLength]}{Environment.NewLine}{Environment.NewLine}[... TRUNCATED {truncatedCount} CHARACTERS ...]{Environment.NewLine}{Environment.NewLine}{output[^tailLength..]}";
     }
 
     internal record ExecuteCommandArguments(string Command = "", string Arguments = "");

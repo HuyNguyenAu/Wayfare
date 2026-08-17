@@ -8,6 +8,11 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
     public string DisplayName => "List";
     public string Description => "List the files and directories inside a directory. Directory names end with a path separator. Parameters: path (string, required - the directory to list)";
 
+    public ToolSchema Parameters => ToolSchema.Object(new Dictionary<string, ToolPropertySchema>
+    {
+        ["path"] = ToolPropertySchema.String("The directory path to list.")
+    });
+
     public string GetInvocationMessage(string arguments)
     {
         return toolHelpers.TryDeserializeArguments(arguments, out ListFilesArguments? args, out _)
@@ -19,17 +24,17 @@ internal sealed class ListTool(IToolHelpers toolHelpers) : ITool
     {
         if (!toolHelpers.TryDeserializeArguments(arguments, out ListFilesArguments? listArguments, out string? listArgumentsError))
         {
-            return new ToolExecutionResult(false, "Failed to list directory due to invalid tool arguments.", string.Empty, $"Failed to list directory: invalid tool arguments. Error: {listArgumentsError}");
+            return new ToolExecutionResult(false, "Failed to list directory due to invalid tool arguments.", string.Empty, $"Failed to list directory: invalid tool arguments. Error: {listArgumentsError}. Usage: {{\"path\": \"<directory_path>\"}}");
         }
 
         if (!toolHelpers.TryGetRequiredPath(listArguments.Path, out string? resolvedPath, out string? requiredPathError))
         {
-            return new ToolExecutionResult(false, $"Failed to list: access denied or invalid path '{listArguments.Path}'.", string.Empty, $"Failed to list: access denied or invalid path '{listArguments.Path}'.");
+            return new ToolExecutionResult(false, $"Failed to list: access denied or invalid path '{listArguments.Path}'.", string.Empty, $"Failed to list: access denied or invalid path '{listArguments.Path}'. Path must be within the working directory.");
         }
 
         if (!Directory.Exists(resolvedPath))
         {
-            return new ToolExecutionResult(false, $"Failed to list: directory does not exist '{listArguments.Path}'.", string.Empty, $"Failed to list: directory does not exist at '{listArguments.Path}'.");
+            return new ToolExecutionResult(false, $"Failed to list: directory does not exist '{listArguments.Path}'.", string.Empty, $"Failed to list: directory does not exist at '{listArguments.Path}'. Use 'find' or 'list' with path \".\" to view existing directories.");
         }
 
         try

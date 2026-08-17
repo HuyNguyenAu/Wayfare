@@ -14,7 +14,8 @@ public class Orchestrator(
     IBranchSquasher branchSquasher,
     IMessagePromptBuilder messagePromptBuilder,
     IIntentResolver intentResolver,
-    IPivotDetector pivotDetector) : IOrchestrator
+    IPivotDetector pivotDetector,
+    ICircuitBreaker circuitBreaker) : IOrchestrator
 {
     private readonly ISession _session = sessionStore.Session;
 
@@ -26,8 +27,17 @@ public class Orchestrator(
 
         await InitialiseCycleAsync(userInput, cancellationToken);
 
+        circuitBreaker.Reset();
+
         while (_session.State != SessionState.Done && !cancellationToken.IsCancellationRequested)
         {
+            if (!circuitBreaker.TryAdvanceTurn(out string? limitExceededReason))
+            {
+                eventPublisher.Publish(new ToolExecutionCompletedEvent(false, "System", "Max turns reached", string.Empty, limitExceededReason));
+                await CompleteCycleAsync(cancellationToken);
+                break;
+            }
+
             ThinkingPhaseResult thinkingResult = await ExecuteThinkingPhaseAsync(cancellationToken);
 
             if (thinkingResult.HasToolCalls)
@@ -150,11 +160,22 @@ public class Orchestrator(
         await sessionStore.SaveAsync(cancellationToken);
 
         IReadOnlyList<Task<ToolExecutionResult>> executionTasks = [.. toolCalls.Select(toolCall => ExecuteToolAsync(toolCall, cancellationToken))];
-        return await Task.WhenAll(executionTasks);
+        ToolExecutionResult[] toolResults = await Task.WhenAll(executionTasks);
+
+        circuitBreaker.RecordResults(toolCalls, toolResults);
+
+        return toolResults;
     }
 
     private async Task<ToolExecutionResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken)
     {
+        if (circuitBreaker.TryIntercept(toolCall, out ToolExecutionResult? interceptedResult))
+        {
+            eventPublisher.Publish(new ToolExecutionStartedEvent(toolCall.Arguments));
+            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolCall.Name, interceptedResult.DisplayMessage, string.Empty, interceptedResult.Error));
+            return interceptedResult;
+        }
+
         bool started = false;
         string toolName = toolCall.Name;
 
@@ -180,13 +201,14 @@ public class Orchestrator(
                 eventPublisher.Publish(new ToolExecutionStartedEvent(message));
             }
 
-            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolName, $"An error occurred: {ex.Message}", string.Empty, ex.Message));
+            string descriptiveError = $"Exception occurred while executing tool '{toolName}': {ex.Message}";
+            eventPublisher.Publish(new ToolExecutionCompletedEvent(false, toolName, $"An error occurred: {ex.Message}", string.Empty, descriptiveError));
 
             return new ToolExecutionResult(
                 Success: false,
                 DisplayMessage: $"An error occurred: {ex.Message}",
                 Result: string.Empty,
-                Error: $"Exception occurred while executing tool '{toolName}': {ex.Message}",
+                Error: descriptiveError,
                 ToolId: toolCall.ToolId,
                 ToolName: toolName,
                 Exception: ex);

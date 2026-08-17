@@ -58,7 +58,8 @@ public class Program
         MessagePromptBuilder messagePromptBuilder = new();
         IntentResolver intentResolver = new(openAIClient);
         PivotDetector pivotDetector = new();
-        Orchestrator orchestrator = new(openAIClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, intentResolver, pivotDetector);
+        CircuitBreaker circuitBreaker = new(settings.MaxTurns);
+        Orchestrator orchestrator = new(openAIClient, toolManager, sessionStore, eventBroker, branchSquasher, messagePromptBuilder, intentResolver, pivotDetector, circuitBreaker);
 
         try
         {

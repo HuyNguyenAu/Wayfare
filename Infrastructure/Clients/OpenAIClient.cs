@@ -71,13 +71,13 @@ public class OpenAIClient(ChatClient client) : IChatClient
 
         foreach (ITool tool in tools)
         {
-            options.Tools.Add(ChatTool.CreateFunctionTool(tool.Name, tool.Description));
+            options.Tools.Add(ChatTool.CreateFunctionTool(tool.Name, tool.Description, tool.Parameters.ToBinaryData(), functionSchemaIsStrict: true));
         }
 
         return options;
     }
 
-    private static List<ChatMessage> MapSessionMessagesToChatMessages(IReadOnlyList<SessionMessage> sessionMessages)
+    internal static List<ChatMessage> MapSessionMessagesToChatMessages(IReadOnlyList<SessionMessage> sessionMessages)
     {
         List<ChatMessage> chatMessages = [];
 
@@ -89,7 +89,11 @@ public class OpenAIClient(ChatClient client) : IChatClient
                 UserMessage message => [new UserChatMessage(message.Content)],
                 AssistantMessage message => [new AssistantChatMessage(message.Content)],
                 ToolCallMessage message => [new AssistantChatMessage(message.ToolCalls.Select(toolCall => ChatToolCall.CreateFunctionToolCall(toolCall.ToolId, toolCall.Name, BinaryData.FromString(toolCall.Arguments))))],
-                ToolResultMessage message => [.. message.Results.Select(toolResult => new ToolChatMessage(toolResult.ToolId, toolResult.Result))],
+                ToolResultMessage message => [.. message.Results.Select(toolResult => new ToolChatMessage(
+                    toolResult.ToolId,
+                    toolResult.Success
+                        ? (string.IsNullOrWhiteSpace(toolResult.Result) ? $"Tool '{toolResult.ToolName}' completed successfully with no output." : toolResult.Result)
+                        : (string.IsNullOrWhiteSpace(toolResult.Error) ? $"ERROR: Tool '{toolResult.ToolName}' failed without an explicit error message. Verify tool parameters and check file paths with 'list' or 'find' before retrying." : $"ERROR: {toolResult.Error}")))],
                 _ => throw new InvalidOperationException($"Unknown message type: {sessionMessage.GetType().Name}")
             };
 

@@ -185,7 +185,7 @@ public class ToolManager(IEventPublisher eventPublisher, IReadOnlyList<ITool> bu
             typeof(Enumerable).Assembly.Location,
             typeof(ITool).Assembly.Location,
             typeof(ToolHelpers).Assembly.Location,
-            typeof(ToolExecutionResult).Assembly.Location,
+            typeof(BinaryData).Assembly.Location,
             typeof(System.Text.Json.JsonSerializer).Assembly.Location,
             typeof(System.Text.Json.Serialization.JsonPropertyNameAttribute).Assembly.Location,
             typeof(Process).Assembly.Location,

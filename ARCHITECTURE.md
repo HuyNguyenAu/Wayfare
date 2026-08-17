@@ -73,11 +73,12 @@ Wayfare/
 │       ├── ReplaceTool.cs
 │       └── WriteFileTool.cs
 ├── Agent/                                     // 5-phase orchestration pipeline & prompt builders
-│   ├── AgentContracts.cs
+│   ├── AgentModels.cs
 │   ├── Orchestrator.cs
 │   ├── IntentResolver.cs
 │   ├── PivotDetector.cs
 │   ├── BranchSquasher.cs
+│   ├── CircuitBreaker.cs                      // Loop detection & repetition breaker strategy
 │   └── Prompts.cs
 └── UI/                                        // Solarpunk terminal interface & Spectre renderers
     ├── ITerminalUI.cs
