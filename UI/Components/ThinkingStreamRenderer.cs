@@ -23,7 +23,7 @@ public sealed class ThinkingStreamRenderer
         if (_isFirstChunk)
         {
             AnsiConsole.MarkupLine($" [{ColourPalette.HexAlgaeLumens} bold]{Markup.Escape("[ ❦ ]")}[/]");
-            AnsiConsole.Markup($"[{ColourPalette.HexSunlitOchre}]⁖ {Markup.Escape("[THOUGHT CANOPY]")}[/] ");
+            AnsiConsole.Markup($"  [{ColourPalette.HexSunlitOchre}]⁖ {Markup.Escape("[THOUGHT CANOPY]")}[/] ");
             _isFirstChunk = false;
             _hasRendered = true;
         }
